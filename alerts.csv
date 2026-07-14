@@ -1,0 +1,11 @@
+name,criticality,expiration_date,days_to_expiry,alert_window_days,owner,vendor
+SAM,critical,2025-06-27,-317,45,OPS Team,OpenText
+Archiving System,high,2025-06-27,-317,30,OPS Team,Stack-X
+Automation and Orchestration,high,2025-06-27,-317,30,OPS Team,Stack-X
+EPM,high,2025-06-27,-317,30,OPS Team,Stack-X
+Reporter,high,2025-06-27,-317,30,OPS Team,Stack-X
+Server Management,high,2025-06-27,-317,30,OPS Team,Stack-X
+UFT,high,2025-06-27,-317,30,OPS Team,OpenText
+Load Runner,high,2025-06-28,-316,30,OPS Team,OpenText
+OBM,high,2025-06-28,-316,30,OPS Team,OpenText
+Public SSL wildcard,critical,2026-05-08,-2,45,OPS Team,DigiCert

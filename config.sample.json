@@ -1,0 +1,26 @@
+{
+  "alert_windows": {
+    "critical": 60,
+    "high": 30,
+    "medium": 14,
+    "low": 7
+  },
+  "column_aliases": {
+    "name": ["product_service", "license", "subscription", "name"],
+    "criticality": ["criticality", "priority", "severity"],
+    "expiration_date": ["expiry_date", "expiration_date", "renewal_date", "support_eol_date"],
+    "owner": ["primary_owner", "renewal_owner", "owner", "team"],
+    "vendor": ["vendor", "provider"]
+  },
+  "smtp": {
+    "_comment": "Copy the keys below into your .env file to enable email notifications",
+    "SMTP_ENABLED": false,
+    "SMTP_HOST": "smtp.example.com",
+    "SMTP_PORT": 587,
+    "SMTP_USE_TLS": true,
+    "SMTP_USERNAME": "your-smtp-user",
+    "SMTP_PASSWORD": "your-smtp-password",
+    "SMTP_FROM_EMAIL": "no-reply@example.com",
+    "SMTP_FROM_NAME": "License Lifecycle Hub"
+  }
+}
