@@ -9,7 +9,8 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from openpyxl import Workbook
 from sqlalchemy import inspect, or_, text
 from sqlalchemy.orm import Session
@@ -297,6 +298,16 @@ def get_items(db: Session, query: str | None = None, status_filter: str | None =
     items = db.query(LicenseItem).all()
     return filter_items(items, query, status_filter, category)
 
+@app.get("/")
+def root():
+    frontend_dist_path = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    if not frontend_dist_path.exists():
+        frontend_dist_path = Path(__file__).resolve().parent.parent / "static"
+    
+    index_file = frontend_dist_path / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {"status": "ok"}
 
 @app.get("/api/control-settings", response_model=ControlSettingsRead)
 def control_settings_get(
@@ -776,3 +787,22 @@ def categories(db: Session = Depends(get_db), current_user: User = Depends(get_c
     _ = current_user
     items = db.query(LicenseItem.category).distinct().all()
     return {"items": sorted(category for category, in items if category)}
+
+
+# Serve frontend static files if they exist (production / monolith support)
+frontend_dist_path = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if not frontend_dist_path.exists():
+    # Fallback to backend/static folder if built/packaged there
+    frontend_dist_path = Path(__file__).resolve().parent.parent / "static"
+
+if frontend_dist_path.exists():
+    app.mount("/assets", StaticFiles(directory=frontend_dist_path / "assets"), name="assets")
+
+    @app.get("/{catchall:path}")
+    async def serve_frontend(catchall: str):
+        if catchall.startswith("api") or catchall.startswith("docs") or catchall.startswith("openapi.json"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        index_file = frontend_dist_path / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="Not Found")
