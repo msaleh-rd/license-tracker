@@ -56,7 +56,7 @@ import { createAppTheme, getThemeColors, PALETTE, PALETTE_LIGHT } from './theme'
 import GroupIcon from '@mui/icons-material/Group';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import { changePassword, createUser, deleteLicense, exportWorkbook, getAuditLogs, getCategories, getControlSettings, getDashboard, getInsights, getLicenses, getMe, getKeycloakConfig, getUsers, hydrateAuthToken, login, saveLicense, setAuthToken, updateControlSettings, updateUserRole, uploadWorkbook } from './api';
+import { changePassword, createUser, deleteLicense, deleteUser, exportWorkbook, getAuditLogs, getCategories, getControlSettings, getDashboard, getInsights, getLicenses, getMe, getKeycloakConfig, getUsers, hydrateAuthToken, login, saveLicense, setAuthToken, updateControlSettings, updateUserRole, uploadWorkbook } from './api';
 import { initKeycloak, isKeycloakAuthenticated, loginWithKeycloak, logoutKeycloak } from './keycloak';
 import { EMPTY_LICENSE_FORM, type AuditLog, type ControlSettings, type CustomFieldDefinition, type CustomRule, type DashboardResponse, type HeatmapCell, type LicenseFormValues, type LicenseItem, type RiskItem, type RuleAction, type RuleCondition, type SummaryCard, type User } from './types';
 
@@ -442,6 +442,17 @@ function App() {
     }
   }
 
+  async function handleDeleteUser(targetUserId: number) {
+    try {
+      setUsersError('');
+      await deleteUser(targetUserId);
+      setUsersList((current) => current.filter((u) => u.id !== targetUserId));
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail;
+      setUsersError(typeof msg === 'string' ? msg : 'Failed to delete user.');
+    }
+  }
+
   async function handleChangePassword(currentPw: string, newPw: string) {
     setPwError('');
     setPwSuccess('');
@@ -629,36 +640,53 @@ function App() {
               : 'radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 34%), radial-gradient(circle at right 15%, rgba(249, 115, 22, 0.10), transparent 28%), linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%)',
         }}
       >
-      <Box className="orb orb-a" sx={{ opacity: themeMode === 'dark' ? 1 : 0.6 }} />
-      <Box className="orb orb-b" sx={{ opacity: themeMode === 'dark' ? 1 : 0.5 }} />
-      <AppBar
-        position="sticky"
-        elevation={0}
-        color="transparent"
-        sx={{
-          backgroundColor: themeMode === 'dark' ? 'rgba(7, 17, 31, 0.72)' : 'rgba(248, 250, 252, 0.92)',
-          color: themeMode === 'dark' ? 'text.primary' : '#0f172a',
-          backdropFilter: 'blur(16px)',
-        }}
-      >
-        <Toolbar sx={{ gap: 2, flexWrap: 'wrap' }}>
-          <Avatar sx={{ bgcolor: 'secondary.main', color: 'background.default', fontWeight: 900 }}>LH</Avatar>
-          <Box sx={{ flex: 1, minWidth: 220 }}>
-            <Typography variant="h6" fontWeight={800}>License Lifecycle Hub</Typography>
-            <Typography variant="body2" color="text.secondary">Centralized license, certificate, and lifecycle tracking</Typography>
-          </Box>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-            <Chip icon={<ShieldIcon />} label={user.role} color={user.role === 'admin' ? 'success' : user.role === 'ops' ? 'warning' : 'default'} variant="outlined" />
-            <Chip label={user.email} variant="outlined" />
-            {user.role === 'admin' && (
-              <Button startIcon={<GroupIcon />} onClick={openUsersDialog} variant="outlined">
-                Users
+        <Box className="orb orb-a" sx={{ opacity: themeMode === 'dark' ? 1 : 0.6 }} />
+        <Box className="orb orb-b" sx={{ opacity: themeMode === 'dark' ? 1 : 0.5 }} />
+        <AppBar
+          position="sticky"
+          elevation={0}
+          color="transparent"
+          sx={{
+            backgroundColor: themeMode === 'dark' ? 'rgba(7, 17, 31, 0.72)' : 'rgba(248, 250, 252, 0.92)',
+            color: themeMode === 'dark' ? 'text.primary' : '#0f172a',
+            backdropFilter: 'blur(16px)',
+          }}
+        >
+          <Toolbar sx={{ gap: 2, flexWrap: 'wrap' }}>
+            <Avatar sx={{ bgcolor: 'secondary.main', color: 'background.default', fontWeight: 900 }}>LH</Avatar>
+            <Box sx={{ flex: 1, minWidth: 220 }}>
+              <Typography variant="h6" fontWeight={800}>License Lifecycle Hub</Typography>
+              <Typography variant="body2" color="text.secondary">Centralized license, certificate, and lifecycle tracking</Typography>
+            </Box>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Chip icon={<ShieldIcon />} label={user.role} color={user.role === 'admin' ? 'success' : user.role === 'ops' ? 'warning' : 'default'} variant="outlined" />
+              <Chip label={user.email} variant="outlined" />
+              {user.role === 'admin' && (
+                <Button startIcon={<GroupIcon />} onClick={openUsersDialog} variant="outlined">
+                  Users
+                </Button>
+              )}
+              {!isSsoUser && (
+                <Tooltip title="Change your password">
+                  <IconButton
+                    onClick={() => { setPwDialogOpen(true); setPwError(''); setPwSuccess(''); }}
+                    color="inherit"
+                    sx={{
+                      border: '1px solid',
+                      borderColor: themeMode === 'dark' ? 'rgba(148, 163, 184, 0.35)' : 'rgba(100, 116, 139, 0.35)',
+                      bgcolor: themeMode === 'dark' ? 'rgba(15, 23, 42, 0.45)' : 'rgba(255, 255, 255, 0.85)',
+                    }}
+                  >
+                    <VpnKeyIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
+              <Button startIcon={<TuneIcon />} onClick={openControlDialog} variant="outlined" disabled={user.role === 'viewer'}>
+                Controls
               </Button>
-            )}
-            {!isSsoUser && (
-              <Tooltip title="Change your password">
+              <Tooltip title={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} mode`}>
                 <IconButton
-                  onClick={() => { setPwDialogOpen(true); setPwError(''); setPwSuccess(''); }}
+                  onClick={() => setThemeMode((current) => (current === 'dark' ? 'light' : 'dark'))}
                   color="inherit"
                   sx={{
                     border: '1px solid',
@@ -666,758 +694,742 @@ function App() {
                     bgcolor: themeMode === 'dark' ? 'rgba(15, 23, 42, 0.45)' : 'rgba(255, 255, 255, 0.85)',
                   }}
                 >
-                  <VpnKeyIcon />
+                  {themeMode === 'dark' ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
                 </IconButton>
               </Tooltip>
-            )}
-            <Button startIcon={<TuneIcon />} onClick={openControlDialog} variant="outlined" disabled={user.role === 'viewer'}>
-              Controls
-            </Button>
-            <Tooltip title={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} mode`}>
-              <IconButton
-                onClick={() => setThemeMode((current) => (current === 'dark' ? 'light' : 'dark'))}
-                color="inherit"
-                sx={{
-                  border: '1px solid',
-                  borderColor: themeMode === 'dark' ? 'rgba(148, 163, 184, 0.35)' : 'rgba(100, 116, 139, 0.35)',
-                  bgcolor: themeMode === 'dark' ? 'rgba(15, 23, 42, 0.45)' : 'rgba(255, 255, 255, 0.85)',
-                }}
-              >
-                {themeMode === 'dark' ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
+              <Button startIcon={<DownloadIcon />} onClick={() => { void exportWorkbook(); }} variant="outlined">Export</Button>
+              <Button component="label" startIcon={importBusy ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />} variant="outlined">
+                Import
+                <input hidden type="file" accept=".xlsx" onChange={handleImport} />
+              </Button>
+              <Button startIcon={<AddIcon />} onClick={openCreateDrawer} variant="contained" disabled={user.role === 'viewer'}>
+                New Record
+              </Button>
+              <IconButton onClick={handleLogout} color="inherit">
+                <LogoutIcon />
               </IconButton>
-            </Tooltip>
-            <Button startIcon={<DownloadIcon />} onClick={() => { void exportWorkbook(); }} variant="outlined">Export</Button>
-            <Button component="label" startIcon={importBusy ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />} variant="outlined">
-              Import
-              <input hidden type="file" accept=".xlsx" onChange={handleImport} />
-            </Button>
-            <Button startIcon={<AddIcon />} onClick={openCreateDrawer} variant="contained" disabled={user.role === 'viewer'}>
-              New Record
-            </Button>
-            <IconButton onClick={handleLogout} color="inherit">
-              <LogoutIcon />
-            </IconButton>
-          </Stack>
-        </Toolbar>
-      </AppBar>
-
-      <Container maxWidth="xl" sx={{ py: 4, position: 'relative', zIndex: 1 }}>
-        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3, borderRadius: 5, background: themeColors.gradientBg }}>
-          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }}>
-            <Box>
-              <Typography variant="h3" sx={{ mt: 0.5 }}>Track renewals, usage, and risk in one place.</Typography>
-            </Box>
-            <Stack direction="row" spacing={1} flexWrap="wrap">
-              <Chip label={`${dashboard?.risk_items.length ?? 0} risky items`} color="warning" />
-              <Chip label={`${dashboard?.alerts.length ?? 0} alerts`} color="error" />
             </Stack>
-          </Stack>
-          {importNotice ? <Alert severity="info" sx={{ mt: 2 }}>{importNotice}</Alert> : null}
-        </Paper>
+          </Toolbar>
+        </AppBar>
 
-        <Box sx={{ display: 'flex', gap: 2.5, mb: 2, flexWrap: 'wrap' }}>
-          {(dashboard?.summary ?? []).map((card, index) => (
-            <Box key={card.label} sx={{ flex: '1 1 0', minWidth: 120 }}>
-              <SummaryTile card={card} index={index} />
-            </Box>
-          ))}
-        </Box>
+        <Container maxWidth="xl" sx={{ py: 4, position: 'relative', zIndex: 1 }}>
+          <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3, borderRadius: 5, background: themeColors.gradientBg }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }}>
+              <Box>
+                <Typography variant="h3" sx={{ mt: 0.5 }}>Track renewals, usage, and risk in one place.</Typography>
+              </Box>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Chip label={`${dashboard?.risk_items.length ?? 0} risky items`} color="warning" />
+                <Chip label={`${dashboard?.alerts.length ?? 0} alerts`} color="error" />
+              </Stack>
+            </Stack>
+            {importNotice ? <Alert severity="info" sx={{ mt: 2 }}>{importNotice}</Alert> : null}
+          </Paper>
 
-        <Grid container spacing={2.5} sx={{ mb: 2 }}>
-          <Grid item xs={12} lg={7}>
-            <Paper sx={{ p: 2.5, height: '100%' }}>
-              <SectionHeading title="Expiry timeline" subtitle="Monthly counts of records expiring over time" icon={<InsightsIcon />} />
-              <Box sx={{ height: 420 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dashboard?.expiry_timeline ?? []}>
+          <Box sx={{ display: 'flex', gap: 2.5, mb: 2, flexWrap: 'wrap' }}>
+            {(dashboard?.summary ?? []).map((card, index) => (
+              <Box key={card.label} sx={{ flex: '1 1 0', minWidth: 120 }}>
+                <SummaryTile card={card} index={index} />
+              </Box>
+            ))}
+          </Box>
+
+          <Grid container spacing={2.5} sx={{ mb: 2 }}>
+            <Grid item xs={12} lg={7}>
+              <Paper sx={{ p: 2.5, height: '100%' }}>
+                <SectionHeading title="Expiry timeline" subtitle="Monthly counts of records expiring over time" icon={<InsightsIcon />} />
+                <Box sx={{ height: 420 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dashboard?.expiry_timeline ?? []}>
                       <CartesianGrid strokeDasharray="3 3" stroke={themeMode === 'dark' ? 'rgba(148,163,184,0.15)' : 'rgba(148,163,184,0.25)'} />
                       <XAxis dataKey="label" stroke={themeMode === 'dark' ? '#94a3b8' : '#64748b'} tick={{ fontSize: 12 }} />
                       <YAxis stroke={themeMode === 'dark' ? '#94a3b8' : '#64748b'} tick={{ fontSize: 12 }} allowDecimals={false} />
-                    <RechartsTooltip contentStyle={{ background: themeColors.tooltipBg, borderColor: themeColors.tooltipBorder, color: themeColors.tooltipText, borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }} />
+                      <RechartsTooltip contentStyle={{ background: themeColors.tooltipBg, borderColor: themeColors.tooltipBorder, color: themeColors.tooltipText, borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }} />
                       <Line type="monotone" dataKey="value" stroke={themeMode === 'dark' ? '#7dd3fc' : '#0284c7'} strokeWidth={3} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Box>
-            </Paper>
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} lg={5}>
+              <Paper sx={{ p: 2.5, height: '100%' }}>
+                <SectionHeading title="Category mix" subtitle="Distribution of tracked items by category" icon={<WarningAmberIcon />} />
+                <Box sx={{ height: 280 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={dashboard?.category_distribution ?? []} dataKey="value" nameKey="label" innerRadius={60} outerRadius={110} paddingAngle={4}>
+                        {(dashboard?.category_distribution ?? []).map((entry, index) => (
+                          <Cell key={entry.label} fill={(themeMode === 'dark' ? PALETTE : PALETTE_LIGHT)[index % (themeMode === 'dark' ? PALETTE.length : PALETTE_LIGHT.length)]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip contentStyle={{ background: themeColors.tooltipBg, borderColor: themeColors.tooltipBorder, color: themeColors.tooltipText, borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Box>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 1.2, mt: 2 }}>
+                  {(dashboard?.category_distribution ?? []).map((entry, index) => {
+                    const color = (themeMode === 'dark' ? PALETTE : PALETTE_LIGHT)[index % (themeMode === 'dark' ? PALETTE.length : PALETTE_LIGHT.length)];
+                    return (
+                      <Stack key={entry.label} direction="row" spacing={1} alignItems="center">
+                        <Box sx={{ width: 12, height: 12, borderRadius: '2px', bgcolor: color, flexShrink: 0 }} />
+                        <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>{entry.label}</Typography>
+                      </Stack>
+                    );
+                  })}
+                </Box>
+              </Paper>
+            </Grid>
           </Grid>
-          <Grid item xs={12} lg={5}>
-            <Paper sx={{ p: 2.5, height: '100%' }}>
-              <SectionHeading title="Category mix" subtitle="Distribution of tracked items by category" icon={<WarningAmberIcon />} />
-              <Box sx={{ height: 280 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={dashboard?.category_distribution ?? []} dataKey="value" nameKey="label" innerRadius={60} outerRadius={110} paddingAngle={4}>
-                      {(dashboard?.category_distribution ?? []).map((entry, index) => (
-                        <Cell key={entry.label} fill={(themeMode === 'dark' ? PALETTE : PALETTE_LIGHT)[index % (themeMode === 'dark' ? PALETTE.length : PALETTE_LIGHT.length)]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip contentStyle={{ background: themeColors.tooltipBg, borderColor: themeColors.tooltipBorder, color: themeColors.tooltipText, borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Box>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 1.2, mt: 2 }}>
-                {(dashboard?.category_distribution ?? []).map((entry, index) => {
-                  const color = (themeMode === 'dark' ? PALETTE : PALETTE_LIGHT)[index % (themeMode === 'dark' ? PALETTE.length : PALETTE_LIGHT.length)];
-                  return (
-                    <Stack key={entry.label} direction="row" spacing={1} alignItems="center">
-                      <Box sx={{ width: 12, height: 12, borderRadius: '2px', bgcolor: color, flexShrink: 0 }} />
-                      <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>{entry.label}</Typography>
-                    </Stack>
-                  );
-                })}
-              </Box>
-            </Paper>
-          </Grid>
-        </Grid>
 
-        <Grid container spacing={2.5} sx={{ mb: 2 }}>
-          <Grid item xs={12} lg={8}>
-            <Paper sx={{ p: 2.5 }}>
-              <SectionHeading title="License register" subtitle="Search, sort, edit, and review tracked records" icon={<ShieldIcon />} />
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
-                <TextField fullWidth placeholder="Search client, vendor, product, owner, email..." value={query} onChange={(event) => setQuery(event.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
-                <FormControl fullWidth>
-                  <InputLabel>Status</InputLabel>
-                  <Select label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                    {['all', 'Active', 'Review', 'Urgent', 'Expired', 'Missing Expiry Info'].map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}
-                  </Select>
-                </FormControl>
-                <FormControl fullWidth>
-                  <InputLabel>Category</InputLabel>
-                  <Select label="Category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-                    <MenuItem value="all">All</MenuItem>
-                    {categories.map((category) => <MenuItem key={category} value={category}>{category}</MenuItem>)}
-                  </Select>
-                </FormControl>
-              </Stack>
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
-                {(['days_to_expiry', 'utilization_percent', 'annual_cost', 'priority', 'status'] as SortKey[]).map((key) => (
-                  <Chip key={key} label={`Sort by ${key.replace(/_/g, ' ')}`} color={sortKey === key ? 'primary' : 'default'} onClick={() => setSortKey((current) => current === key ? key : key)} onDelete={sortKey === key ? () => setSortDirection((direction) => direction === 'asc' ? 'desc' : 'asc') : undefined} />
-                ))}
-              </Stack>
-              <Box sx={{ overflowX: 'auto' }}>
-                <Table size="small" sx={{ minWidth: 2350 }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Client</TableCell>
-                      <TableCell>Site / Region</TableCell>
-                      <TableCell>Item Type</TableCell>
-                      <TableCell>Environment</TableCell>
-                      <TableCell>Vendor / Product</TableCell>
-                      <TableCell>Renewal Cycle</TableCell>
-                      <TableCell>Auto Renew</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Expiry</TableCell>
-                      <TableCell>Support / EOL</TableCell>
-                      <TableCell>Last Reviewed</TableCell>
-                      <TableCell>Utilization</TableCell>
-                      <TableCell>Unit Cost</TableCell>
-                      <TableCell>Annual Cost</TableCell>
-                      <TableCell>Priority</TableCell>
-                      <TableCell>Primary Owner</TableCell>
-                      <TableCell>Renewal Owner</TableCell>
-                      <TableCell>Technical Contact</TableCell>
-                      <TableCell>Email</TableCell>
-                      <TableCell>Notes</TableCell>
-                      {(controlSettings?.custom_field_definitions ?? []).map((fieldDef) => (
-                        <TableCell key={fieldDef.key}>{fieldDef.label}</TableCell>
-                      ))}
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredLicenses.map((item) => (
-                      <TableRow key={item.id} hover>
-                        <TableCell>
-                          <Typography fontWeight={700}>{item.client}</Typography>
-                          <Typography variant="caption" color="text.secondary">{item.category || '—'}</Typography>
-                        </TableCell>
-                        <TableCell>{item.region || '—'}</TableCell>
-                        <TableCell>{item.item_type || '—'}</TableCell>
-                        <TableCell>{item.environment || '—'}</TableCell>
-                        <TableCell>
-                          <Typography>{item.vendor || '—'}</Typography>
-                          <Typography variant="caption" color="text.secondary">{item.product_service || '—'}</Typography>
-                        </TableCell>
-                        <TableCell>{item.renewal_cycle || '—'}</TableCell>
-                        <TableCell>{item.auto_renew ? 'Yes' : 'No'}</TableCell>
-                        <TableCell>
-                          <StatusChip status={item.status} />
-                        </TableCell>
-                        <TableCell>
-                          <Typography>{formatDate(item.expiry_date)}</Typography>
-                          <Typography variant="caption" color={item.days_to_expiry != null && item.days_to_expiry < 0 ? 'error.main' : 'text.secondary'}>{item.days_to_expiry != null ? `${item.days_to_expiry} days` : '—'}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography>{item.eol_date ? formatDate(item.eol_date) : '—'}</Typography>
-                          <Typography variant="caption" color={item.days_to_eol != null && item.days_to_eol < 0 ? 'error.main' : 'text.secondary'}>{item.days_to_eol != null ? `${item.days_to_eol} days` : '—'}</Typography>
-                        </TableCell>
-                        <TableCell>{formatDate(item.last_reviewed)}</TableCell>
-                        <TableCell>
-                          {(() => {
-                            const utilization = item.quantity_purchased > 0
-                              ? Number(((item.quantity_in_use / item.quantity_purchased) * 100).toFixed(1))
-                              : 0;
-                            return (
-                              <>
-                                <Typography>{utilization.toFixed(1)}%</Typography>
-                                <Typography variant="caption" color={utilization > 100 ? 'error.main' : utilization < 20 ? 'warning.main' : 'text.secondary'}>{item.quantity_in_use}/{item.quantity_purchased}</Typography>
-                              </>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell>{formatCurrency(item.unit_cost, currencyCode)}</TableCell>
-                        <TableCell>{formatCurrency(item.annual_cost, currencyCode)}</TableCell>
-                        <TableCell>{item.priority}</TableCell>
-                        <TableCell>{item.owner || '—'}</TableCell>
-                        <TableCell>{item.renewal_owner || '—'}</TableCell>
-                        <TableCell>{item.technical_contact || '—'}</TableCell>
-                        <TableCell>{item.email || '—'}</TableCell>
-                        <TableCell>
-                          <Typography variant="body2" noWrap sx={{ maxWidth: 220 }} title={item.notes || '—'}>
-                            {item.notes || '—'}
-                          </Typography>
-                        </TableCell>
-                        {(controlSettings?.custom_field_definitions ?? []).map((fieldDef) => {
-                          const customVal = (item.custom_fields as Record<string, unknown>)?.[fieldDef.key];
-                          const display = customVal === undefined || customVal === null || customVal === '' ? '—' : String(customVal);
-                          return (
-                            <TableCell key={fieldDef.key}>
-                              <Typography variant="body2" noWrap sx={{ maxWidth: 160 }} title={display}>
-                                {display}
-                              </Typography>
-                            </TableCell>
-                          );
-                        })}
-                        <TableCell align="right">
-                          <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
-                            <Tooltip title="Edit"><span><IconButton size="small" disabled={user.role === 'viewer'} onClick={() => openEditDrawer(item)}><EditIcon fontSize="small" /></IconButton></span></Tooltip>
-                            <Tooltip title="Delete"><span><IconButton size="small" disabled={user.role !== 'admin'} onClick={() => setDeleteCandidate(item)}><DeleteIcon fontSize="small" /></IconButton></span></Tooltip>
-                          </Stack>
-                        </TableCell>
+          <Grid container spacing={2.5} sx={{ mb: 2 }}>
+            <Grid item xs={12} lg={8}>
+              <Paper sx={{ p: 2.5 }}>
+                <SectionHeading title="License register" subtitle="Search, sort, edit, and review tracked records" icon={<ShieldIcon />} />
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
+                  <TextField fullWidth placeholder="Search client, vendor, product, owner, email..." value={query} onChange={(event) => setQuery(event.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
+                  <FormControl fullWidth>
+                    <InputLabel>Status</InputLabel>
+                    <Select label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                      {['all', 'Active', 'Review', 'Urgent', 'Expired', 'Missing Expiry Info'].map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth>
+                    <InputLabel>Category</InputLabel>
+                    <Select label="Category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                      <MenuItem value="all">All</MenuItem>
+                      {categories.map((category) => <MenuItem key={category} value={category}>{category}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                </Stack>
+                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
+                  {(['days_to_expiry', 'utilization_percent', 'annual_cost', 'priority', 'status'] as SortKey[]).map((key) => (
+                    <Chip key={key} label={`Sort by ${key.replace(/_/g, ' ')}`} color={sortKey === key ? 'primary' : 'default'} onClick={() => setSortKey((current) => current === key ? key : key)} onDelete={sortKey === key ? () => setSortDirection((direction) => direction === 'asc' ? 'desc' : 'asc') : undefined} />
+                  ))}
+                </Stack>
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Table size="small" sx={{ minWidth: 2350 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Client</TableCell>
+                        <TableCell>Site / Region</TableCell>
+                        <TableCell>Item Type</TableCell>
+                        <TableCell>Environment</TableCell>
+                        <TableCell>Vendor / Product</TableCell>
+                        <TableCell>Renewal Cycle</TableCell>
+                        <TableCell>Auto Renew</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Expiry</TableCell>
+                        <TableCell>Support / EOL</TableCell>
+                        <TableCell>Last Reviewed</TableCell>
+                        <TableCell>Utilization</TableCell>
+                        <TableCell>Unit Cost</TableCell>
+                        <TableCell>Annual Cost</TableCell>
+                        <TableCell>Priority</TableCell>
+                        <TableCell>Primary Owner</TableCell>
+                        <TableCell>Renewal Owner</TableCell>
+                        <TableCell>Technical Contact</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Notes</TableCell>
+                        {(controlSettings?.custom_field_definitions ?? []).map((fieldDef) => (
+                          <TableCell key={fieldDef.key}>{fieldDef.label}</TableCell>
+                        ))}
+                        <TableCell align="right">Actions</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Box>
-            </Paper>
+                    </TableHead>
+                    <TableBody>
+                      {filteredLicenses.map((item) => (
+                        <TableRow key={item.id} hover>
+                          <TableCell>
+                            <Typography fontWeight={700}>{item.client}</Typography>
+                            <Typography variant="caption" color="text.secondary">{item.category || '—'}</Typography>
+                          </TableCell>
+                          <TableCell>{item.region || '—'}</TableCell>
+                          <TableCell>{item.item_type || '—'}</TableCell>
+                          <TableCell>{item.environment || '—'}</TableCell>
+                          <TableCell>
+                            <Typography>{item.vendor || '—'}</Typography>
+                            <Typography variant="caption" color="text.secondary">{item.product_service || '—'}</Typography>
+                          </TableCell>
+                          <TableCell>{item.renewal_cycle || '—'}</TableCell>
+                          <TableCell>{item.auto_renew ? 'Yes' : 'No'}</TableCell>
+                          <TableCell>
+                            <StatusChip status={item.status} />
+                          </TableCell>
+                          <TableCell>
+                            <Typography>{formatDate(item.expiry_date)}</Typography>
+                            <Typography variant="caption" color={item.days_to_expiry != null && item.days_to_expiry < 0 ? 'error.main' : 'text.secondary'}>{item.days_to_expiry != null ? `${item.days_to_expiry} days` : '—'}</Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography>{item.eol_date ? formatDate(item.eol_date) : '—'}</Typography>
+                            <Typography variant="caption" color={item.days_to_eol != null && item.days_to_eol < 0 ? 'error.main' : 'text.secondary'}>{item.days_to_eol != null ? `${item.days_to_eol} days` : '—'}</Typography>
+                          </TableCell>
+                          <TableCell>{formatDate(item.last_reviewed)}</TableCell>
+                          <TableCell>
+                            {(() => {
+                              const utilization = item.quantity_purchased > 0
+                                ? Number(((item.quantity_in_use / item.quantity_purchased) * 100).toFixed(1))
+                                : 0;
+                              return (
+                                <>
+                                  <Typography>{utilization.toFixed(1)}%</Typography>
+                                  <Typography variant="caption" color={utilization > 100 ? 'error.main' : utilization < 20 ? 'warning.main' : 'text.secondary'}>{item.quantity_in_use}/{item.quantity_purchased}</Typography>
+                                </>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>{formatCurrency(item.unit_cost, currencyCode)}</TableCell>
+                          <TableCell>{formatCurrency(item.annual_cost, currencyCode)}</TableCell>
+                          <TableCell>{item.priority}</TableCell>
+                          <TableCell>{item.owner || '—'}</TableCell>
+                          <TableCell>{item.renewal_owner || '—'}</TableCell>
+                          <TableCell>{item.technical_contact || '—'}</TableCell>
+                          <TableCell>{item.email || '—'}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" noWrap sx={{ maxWidth: 220 }} title={item.notes || '—'}>
+                              {item.notes || '—'}
+                            </Typography>
+                          </TableCell>
+                          {(controlSettings?.custom_field_definitions ?? []).map((fieldDef) => {
+                            const customVal = (item.custom_fields as Record<string, unknown>)?.[fieldDef.key];
+                            const display = customVal === undefined || customVal === null || customVal === '' ? '—' : String(customVal);
+                            return (
+                              <TableCell key={fieldDef.key}>
+                                <Typography variant="body2" noWrap sx={{ maxWidth: 160 }} title={display}>
+                                  {display}
+                                </Typography>
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell align="right">
+                            <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
+                              <Tooltip title="Edit"><span><IconButton size="small" disabled={user.role === 'viewer'} onClick={() => openEditDrawer(item)}><EditIcon fontSize="small" /></IconButton></span></Tooltip>
+                              <Tooltip title="Delete"><span><IconButton size="small" disabled={user.role !== 'admin'} onClick={() => setDeleteCandidate(item)}><DeleteIcon fontSize="small" /></IconButton></span></Tooltip>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} lg={4}>
+              <Stack spacing={2.5}>
+                <Paper sx={{ p: 2.5 }}>
+                  <SectionHeading title="Risk panel" subtitle="Top items that need action" icon={<WarningAmberIcon />} />
+                  <Stack spacing={1.5}>
+                    {(dashboard?.risk_items ?? []).map((item) => <RiskRow key={item.id} item={item} />)}
+                  </Stack>
+                </Paper>
+                <Paper sx={{ p: 2.5 }}>
+                  <SectionHeading title="Utilization heatmap" subtitle="Quickly spot under- and over-used categories" icon={<InsightsIcon />} />
+                  <Heatmap data={dashboard?.utilization_heatmap ?? []} />
+                </Paper>
+                <Paper sx={{ p: 2.5 }}>
+                  <SectionHeading title="Predictive insights" subtitle="Forecasted renewal cost and anomaly signals" icon={<InsightsIcon />} />
+                  <Grid container spacing={1.5}>
+                    <InsightChip label="Forecast renewal cost" value={formatCurrency(insights.forecasted_renewal_cost ?? dashboard?.predictive_insights.forecasted_renewal_cost ?? 0, currencyCode)} tone="info" />
+                    <InsightChip label="Anomaly count" value={String(insights.anomaly_count ?? dashboard?.predictive_insights.anomaly_count ?? 0)} tone="warning" />
+                    <InsightChip label="Missing fields" value={String(insights.missing_fields ?? dashboard?.predictive_insights.missing_fields ?? 0)} tone="danger" />
+                    <InsightChip label="At risk spend" value={formatCurrency(insights.at_risk_spend ?? dashboard?.predictive_insights.at_risk_spend ?? 0, currencyCode)} tone="success" />
+                  </Grid>
+                </Paper>
+              </Stack>
+            </Grid>
           </Grid>
-          <Grid item xs={12} lg={4}>
-            <Stack spacing={2.5}>
+
+          <Grid container spacing={2.5}>
+            <Grid item xs={12} md={7}>
               <Paper sx={{ p: 2.5 }}>
-                <SectionHeading title="Risk panel" subtitle="Top items that need action" icon={<WarningAmberIcon />} />
-                <Stack spacing={1.5}>
-                  {(dashboard?.risk_items ?? []).map((item) => <RiskRow key={item.id} item={item} />)}
+                <SectionHeading title="Alerts & workflow" subtitle="Expired, urgent, and review queue" icon={<WarningAmberIcon />} />
+                <Stack spacing={1.2}>
+                  {(dashboard?.alerts ?? []).map((item) => (
+                    <Alert key={item.id} severity={item.status === 'Expired' ? 'error' : item.status === 'Urgent' || item.status === 'Missing Expiry Info' ? 'warning' : 'info'}>
+                      {item.client} · {item.product_service} · {item.days_to_expiry != null ? `${item.days_to_expiry} days remaining` : 'no expiry date'} · {item.risk_flags.join(', ') || 'status review'}
+                    </Alert>
+                  ))}
                 </Stack>
               </Paper>
+            </Grid>
+            <Grid item xs={12} md={5}>
               <Paper sx={{ p: 2.5 }}>
-                <SectionHeading title="Utilization heatmap" subtitle="Quickly spot under- and over-used categories" icon={<InsightsIcon />} />
-                <Heatmap data={dashboard?.utilization_heatmap ?? []} />
+                <SectionHeading title="Audit trail" subtitle="Recent changes and actors" icon={<ShieldIcon />} />
+                <Stack spacing={1.1}>
+                  {auditLogs.slice(0, 8).map((entry) => (
+                    <Box key={entry.id} sx={{ p: 1.2, borderRadius: 2, bgcolor: themeColors.componentBg }}>
+                      <Typography variant="body2" fontWeight={700}>{entry.actor} · {entry.action} · {entry.field_name}</Typography>
+                      <Typography variant="caption" color="text.secondary">{entry.before_value || '—'} → {entry.after_value || '—'}</Typography>
+                    </Box>
+                  ))}
+                </Stack>
               </Paper>
-              <Paper sx={{ p: 2.5 }}>
-                <SectionHeading title="Predictive insights" subtitle="Forecasted renewal cost and anomaly signals" icon={<InsightsIcon />} />
-                <Grid container spacing={1.5}>
-                  <InsightChip label="Forecast renewal cost" value={formatCurrency(insights.forecasted_renewal_cost ?? dashboard?.predictive_insights.forecasted_renewal_cost ?? 0, currencyCode)} tone="info" />
-                  <InsightChip label="Anomaly count" value={String(insights.anomaly_count ?? dashboard?.predictive_insights.anomaly_count ?? 0)} tone="warning" />
-                  <InsightChip label="Missing fields" value={String(insights.missing_fields ?? dashboard?.predictive_insights.missing_fields ?? 0)} tone="danger" />
-                  <InsightChip label="At risk spend" value={formatCurrency(insights.at_risk_spend ?? dashboard?.predictive_insights.at_risk_spend ?? 0, currencyCode)} tone="success" />
-                </Grid>
-              </Paper>
+            </Grid>
+          </Grid>
+        </Container>
+
+        <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer} PaperProps={{ sx: { width: { xs: '100%', md: 920 }, p: 2 } }}>
+          <Stack spacing={2} sx={{ height: '100%' }}>
+            <Box>
+              <Typography variant="h5" fontWeight={800}>{selectedItem ? 'Edit record' : 'Create record'}</Typography>
+              <Typography variant="body2" color="text.secondary">Dashboard, lifecycle, ownership, and financial fields stay in sync.</Typography>
+            </Box>
+            <Divider />
+            {saveError ? <Alert severity="error">{saveError}</Alert> : null}
+            <Box sx={{ flex: 1, overflowY: 'auto', pr: 1 }}>
+              <LicenseForm draft={draft} onChange={handleDraftChange} optionLists={formOptions} customFieldDefs={controlSettings?.custom_field_definitions ?? []} />
+            </Box>
+            <Stack direction="row" justifyContent="space-between" spacing={1}>
+              <Button onClick={closeDrawer}>Cancel</Button>
+              <Button variant="contained" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button>
             </Stack>
-          </Grid>
-        </Grid>
-
-        <Grid container spacing={2.5}>
-          <Grid item xs={12} md={7}>
-            <Paper sx={{ p: 2.5 }}>
-              <SectionHeading title="Alerts & workflow" subtitle="Expired, urgent, and review queue" icon={<WarningAmberIcon />} />
-              <Stack spacing={1.2}>
-                {(dashboard?.alerts ?? []).map((item) => (
-                  <Alert key={item.id} severity={item.status === 'Expired' ? 'error' : item.status === 'Urgent' || item.status === 'Missing Expiry Info' ? 'warning' : 'info'}>
-                    {item.client} · {item.product_service} · {item.days_to_expiry != null ? `${item.days_to_expiry} days remaining` : 'no expiry date'} · {item.risk_flags.join(', ') || 'status review'}
-                  </Alert>
-                ))}
-              </Stack>
-            </Paper>
-          </Grid>
-          <Grid item xs={12} md={5}>
-            <Paper sx={{ p: 2.5 }}>
-              <SectionHeading title="Audit trail" subtitle="Recent changes and actors" icon={<ShieldIcon />} />
-              <Stack spacing={1.1}>
-                {auditLogs.slice(0, 8).map((entry) => (
-                  <Box key={entry.id} sx={{ p: 1.2, borderRadius: 2, bgcolor: themeColors.componentBg }}>
-                    <Typography variant="body2" fontWeight={700}>{entry.actor} · {entry.action} · {entry.field_name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{entry.before_value || '—'} → {entry.after_value || '—'}</Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Container>
-
-      <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer} PaperProps={{ sx: { width: { xs: '100%', md: 920 }, p: 2 } }}>
-        <Stack spacing={2} sx={{ height: '100%' }}>
-          <Box>
-            <Typography variant="h5" fontWeight={800}>{selectedItem ? 'Edit record' : 'Create record'}</Typography>
-            <Typography variant="body2" color="text.secondary">Dashboard, lifecycle, ownership, and financial fields stay in sync.</Typography>
-          </Box>
-          <Divider />
-          {saveError ? <Alert severity="error">{saveError}</Alert> : null}
-          <Box sx={{ flex: 1, overflowY: 'auto', pr: 1 }}>
-            <LicenseForm draft={draft} onChange={handleDraftChange} optionLists={formOptions} customFieldDefs={controlSettings?.custom_field_definitions ?? []} />
-          </Box>
-          <Stack direction="row" justifyContent="space-between" spacing={1}>
-            <Button onClick={closeDrawer}>Cancel</Button>
-            <Button variant="contained" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button>
           </Stack>
-        </Stack>
-      </Drawer>
+        </Drawer>
 
-      <Dialog open={Boolean(deleteCandidate)} onClose={() => setDeleteCandidate(null)}>
-        <DialogTitle>Delete record</DialogTitle>
-        <DialogContent>
-          <Typography>Remove {deleteCandidate?.product_service} from the register?</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteCandidate(null)}>Cancel</Button>
-          <Button color="error" variant="contained" onClick={handleDeleteConfirmed}>Delete</Button>
-        </DialogActions>
-      </Dialog>
+        <Dialog open={Boolean(deleteCandidate)} onClose={() => setDeleteCandidate(null)}>
+          <DialogTitle>Delete record</DialogTitle>
+          <DialogContent>
+            <Typography>Remove {deleteCandidate?.product_service} from the register?</Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteCandidate(null)}>Cancel</Button>
+            <Button color="error" variant="contained" onClick={handleDeleteConfirmed}>Delete</Button>
+          </DialogActions>
+        </Dialog>
 
-      <Dialog open={controlDialogOpen} onClose={() => setControlDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Control / Threshold Settings</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            {controlError ? <Alert severity="error">{controlError}</Alert> : null}
-            <TextField
-              type="number"
-              label="Urgent days threshold"
-              value={controlDraft?.urgent_days_threshold ?? 30}
-              onChange={(event) => setControlDraft((current) => current ? { ...current, urgent_days_threshold: Number(event.target.value) } : current)}
-              fullWidth
-            />
-            <TextField
-              type="number"
-              label="Review days threshold"
-              value={controlDraft?.review_days_threshold ?? 60}
-              onChange={(event) => setControlDraft((current) => current ? { ...current, review_days_threshold: Number(event.target.value) } : current)}
-              fullWidth
-            />
-            <TextField
-              type="number"
-              label="EOL soon threshold"
-              value={controlDraft?.eol_soon_threshold ?? 90}
-              onChange={(event) => setControlDraft((current) => current ? { ...current, eol_soon_threshold: Number(event.target.value) } : current)}
-              fullWidth
-            />
-            <TextField
-              type="number"
-              label="Default reminder lead time"
-              value={controlDraft?.default_reminder_lead_time ?? 60}
-              onChange={(event) => setControlDraft((current) => current ? { ...current, default_reminder_lead_time: Number(event.target.value) } : current)}
-              fullWidth
-            />
-            <FormControl fullWidth>
-              <InputLabel>Base currency</InputLabel>
-              <Select
-                label="Base currency"
-                value={controlDraft?.base_currency ?? 'USD'}
-                onChange={(event) => setControlDraft((current) => current ? { ...current, base_currency: event.target.value } : current)}
-              >
-                {formOptions.currency_options.map((code) => (
-                  <MenuItem key={code} value={code}>{code}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              label="Template version"
-              value={controlDraft?.template_version ?? '1.0'}
-              onChange={(event) => setControlDraft((current) => current ? { ...current, template_version: event.target.value } : current)}
-              fullWidth
-            />
-            <OptionsTextField
-              label="Category list"
-              options={controlDraft?.category_options ?? []}
-              onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, category_options: opts } : current)}
-            />
-            <OptionsTextField
-              label="Item type list"
-              options={controlDraft?.item_type_options ?? []}
-              onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, item_type_options: opts } : current)}
-            />
-            <OptionsTextField
-              label="Environment list"
-              options={controlDraft?.environment_options ?? []}
-              onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, environment_options: opts } : current)}
-            />
-            <OptionsTextField
-              label="Renewal cycle list"
-              options={controlDraft?.renewal_cycle_options ?? []}
-              onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, renewal_cycle_options: opts } : current)}
-            />
-            <OptionsTextField
-              label="Auto renew list"
-              minRows={2}
-              maxRows={8}
-              options={controlDraft?.auto_renew_options ?? []}
-              onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, auto_renew_options: opts } : current)}
-            />
-            <OptionsTextField
-              label="Priority list"
-              minRows={2}
-              maxRows={8}
-              options={controlDraft?.priority_options ?? []}
-              onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, priority_options: opts } : current)}
-            />
-            <OptionsTextField
-              label="Currency list"
-              minRows={2}
-              maxRows={8}
-              options={controlDraft?.currency_options ?? []}
-              onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, currency_options: opts } : current)}
-            />
+        <Dialog open={controlDialogOpen} onClose={() => setControlDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Control / Threshold Settings</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              {controlError ? <Alert severity="error">{controlError}</Alert> : null}
+              <TextField
+                type="number"
+                label="Urgent days threshold"
+                value={controlDraft?.urgent_days_threshold ?? 30}
+                onChange={(event) => setControlDraft((current) => current ? { ...current, urgent_days_threshold: Number(event.target.value) } : current)}
+                fullWidth
+              />
+              <TextField
+                type="number"
+                label="Review days threshold"
+                value={controlDraft?.review_days_threshold ?? 60}
+                onChange={(event) => setControlDraft((current) => current ? { ...current, review_days_threshold: Number(event.target.value) } : current)}
+                fullWidth
+              />
+              <TextField
+                type="number"
+                label="EOL soon threshold"
+                value={controlDraft?.eol_soon_threshold ?? 90}
+                onChange={(event) => setControlDraft((current) => current ? { ...current, eol_soon_threshold: Number(event.target.value) } : current)}
+                fullWidth
+              />
+              <TextField
+                type="number"
+                label="Default reminder lead time"
+                value={controlDraft?.default_reminder_lead_time ?? 60}
+                onChange={(event) => setControlDraft((current) => current ? { ...current, default_reminder_lead_time: Number(event.target.value) } : current)}
+                fullWidth
+              />
+              <FormControl fullWidth>
+                <InputLabel>Base currency</InputLabel>
+                <Select
+                  label="Base currency"
+                  value={controlDraft?.base_currency ?? 'USD'}
+                  onChange={(event) => setControlDraft((current) => current ? { ...current, base_currency: event.target.value } : current)}
+                >
+                  {formOptions.currency_options.map((code) => (
+                    <MenuItem key={code} value={code}>{code}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Template version"
+                value={controlDraft?.template_version ?? '1.0'}
+                onChange={(event) => setControlDraft((current) => current ? { ...current, template_version: event.target.value } : current)}
+                fullWidth
+              />
+              <OptionsTextField
+                label="Category list"
+                options={controlDraft?.category_options ?? []}
+                onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, category_options: opts } : current)}
+              />
+              <OptionsTextField
+                label="Item type list"
+                options={controlDraft?.item_type_options ?? []}
+                onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, item_type_options: opts } : current)}
+              />
+              <OptionsTextField
+                label="Environment list"
+                options={controlDraft?.environment_options ?? []}
+                onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, environment_options: opts } : current)}
+              />
+              <OptionsTextField
+                label="Renewal cycle list"
+                options={controlDraft?.renewal_cycle_options ?? []}
+                onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, renewal_cycle_options: opts } : current)}
+              />
+              <OptionsTextField
+                label="Auto renew list"
+                minRows={2}
+                maxRows={8}
+                options={controlDraft?.auto_renew_options ?? []}
+                onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, auto_renew_options: opts } : current)}
+              />
+              <OptionsTextField
+                label="Priority list"
+                minRows={2}
+                maxRows={8}
+                options={controlDraft?.priority_options ?? []}
+                onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, priority_options: opts } : current)}
+              />
+              <OptionsTextField
+                label="Currency list"
+                minRows={2}
+                maxRows={8}
+                options={controlDraft?.currency_options ?? []}
+                onOptionsChange={(opts) => setControlDraft((current) => current ? { ...current, currency_options: opts } : current)}
+              />
 
-            <Divider />
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Box>
-                <Typography variant="subtitle1" fontWeight={800}>Custom Fields</Typography>
-                <Typography variant="body2" color="text.secondary">Define extra columns that appear in the form and table. Changes take effect immediately after saving.</Typography>
-              </Box>
-              <Button variant="outlined" onClick={addFieldDef}>Add Field</Button>
-            </Stack>
+              <Divider />
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={800}>Custom Fields</Typography>
+                  <Typography variant="body2" color="text.secondary">Define extra columns that appear in the form and table. Changes take effect immediately after saving.</Typography>
+                </Box>
+                <Button variant="outlined" onClick={addFieldDef}>Add Field</Button>
+              </Stack>
 
-            {(controlDraft?.custom_field_definitions ?? []).map((fieldDef, fieldIndex) => (
-              <Paper key={fieldDef.key || `field-${fieldIndex}`} sx={{ p: 1.5, bgcolor: themeColors.componentBg }}>
-                <Stack spacing={1.2}>
-                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
-                    <TextField
-                      label="Label (display name)"
-                      value={fieldDef.label}
-                      fullWidth
-                      onChange={(event) => {
-                        const newLabel = event.target.value;
-                        updateFieldDef(fieldIndex, (current) => ({
-                          ...current,
-                          label: newLabel,
-                          // Auto-update key only if it still matches the old slug
-                          key: current.key === slugifyKey(current.label) ? slugifyKey(newLabel) : current.key,
-                        }));
-                      }}
-                    />
-                    <TextField
-                      label="Field key (internal)"
-                      value={fieldDef.key}
-                      fullWidth
-                      inputProps={{ pattern: '[a-z0-9_]+' }}
-                      helperText="Lowercase letters, numbers, underscores only"
-                      onChange={(event) => updateFieldDef(fieldIndex, (current) => ({ ...current, key: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
-                    />
-                    <FormControl fullWidth>
-                      <InputLabel>Type</InputLabel>
-                      <Select
-                        label="Type"
-                        value={fieldDef.type}
-                        onChange={(event) => updateFieldDef(fieldIndex, (current) => ({ ...current, type: event.target.value as CustomFieldDefinition['type'] }))}
-                      >
-                        <MenuItem value="text">Text</MenuItem>
-                        <MenuItem value="number">Number</MenuItem>
-                        <MenuItem value="date">Date</MenuItem>
-                        <MenuItem value="boolean">Yes / No</MenuItem>
-                        <MenuItem value="select">Select (from list)</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Stack>
-                  {fieldDef.type === 'select' ? (
-                    <OptionsTextField
-                      label="Options (one per line)"
-                      minRows={2}
-                      maxRows={8}
-                      options={fieldDef.options ?? []}
-                      onOptionsChange={(opts) => updateFieldDef(fieldIndex, (current) => ({ ...current, options: opts }))}
-                    />
-                  ) : null}
-                  <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
-                    <Chip label={fieldDef.required ? 'Required' : 'Optional'} color={fieldDef.required ? 'warning' : 'default'} size="small" />
-                    <Stack direction="row" spacing={1}>
-                      <Button size="small" onClick={() => updateFieldDef(fieldIndex, (current) => ({ ...current, required: !current.required }))}>
-                        Toggle required
-                      </Button>
-                      <Button size="small" color="error" onClick={() => removeFieldDef(fieldIndex)}>
-                        Delete
-                      </Button>
-                    </Stack>
-                  </Stack>
-                </Stack>
-              </Paper>
-            ))}
-
-            <Divider />
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Box>
-                <Typography variant="subtitle1" fontWeight={800}>Custom Rules</Typography>
-                <Typography variant="body2" color="text.secondary">Define IF conditions and THEN actions without changing backend code.</Typography>
-              </Box>
-              <Button variant="outlined" onClick={addRule}>Add Rule</Button>
-            </Stack>
-
-            {(controlDraft?.custom_rules ?? []).map((rule, ruleIndex) => (
-              <Paper key={rule.id ?? `rule-${ruleIndex}`} sx={{ p: 1.5, bgcolor: themeColors.componentBg }}>
-                <Stack spacing={1.2}>
-                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
-                    <TextField
-                      label="Rule Name"
-                      value={rule.name}
-                      onChange={(event) => updateRule(ruleIndex, (current) => ({ ...current, name: event.target.value }))}
-                      fullWidth
-                    />
-                    <FormControl fullWidth>
-                      <InputLabel>Scope</InputLabel>
-                      <Select
-                        label="Scope"
-                        value={rule.scope}
-                        onChange={(event) => updateRule(ruleIndex, (current) => ({ ...current, scope: event.target.value as CustomRule['scope'] }))}
-                      >
-                        <MenuItem value="global">Global</MenuItem>
-                        <MenuItem value="category">Per Category</MenuItem>
-                      </Select>
-                    </FormControl>
-                    {rule.scope === 'category' ? (
+              {(controlDraft?.custom_field_definitions ?? []).map((fieldDef, fieldIndex) => (
+                <Paper key={fieldDef.key || `field-${fieldIndex}`} sx={{ p: 1.5, bgcolor: themeColors.componentBg }}>
+                  <Stack spacing={1.2}>
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
+                      <TextField
+                        label="Label (display name)"
+                        value={fieldDef.label}
+                        fullWidth
+                        onChange={(event) => {
+                          const newLabel = event.target.value;
+                          updateFieldDef(fieldIndex, (current) => ({
+                            ...current,
+                            label: newLabel,
+                            // Auto-update key only if it still matches the old slug
+                            key: current.key === slugifyKey(current.label) ? slugifyKey(newLabel) : current.key,
+                          }));
+                        }}
+                      />
+                      <TextField
+                        label="Field key (internal)"
+                        value={fieldDef.key}
+                        fullWidth
+                        inputProps={{ pattern: '[a-z0-9_]+' }}
+                        helperText="Lowercase letters, numbers, underscores only"
+                        onChange={(event) => updateFieldDef(fieldIndex, (current) => ({ ...current, key: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
+                      />
                       <FormControl fullWidth>
-                        <InputLabel>Category</InputLabel>
+                        <InputLabel>Type</InputLabel>
                         <Select
-                          label="Category"
-                          value={rule.category ?? ''}
-                          onChange={(event) => updateRule(ruleIndex, (current) => ({ ...current, category: event.target.value || null }))}
+                          label="Type"
+                          value={fieldDef.type}
+                          onChange={(event) => updateFieldDef(fieldIndex, (current) => ({ ...current, type: event.target.value as CustomFieldDefinition['type'] }))}
                         >
-                          <MenuItem value=""><em>Select</em></MenuItem>
-                          {formOptions.category_options.map((category) => (
-                            <MenuItem key={category} value={category}>{category}</MenuItem>
-                          ))}
+                          <MenuItem value="text">Text</MenuItem>
+                          <MenuItem value="number">Number</MenuItem>
+                          <MenuItem value="date">Date</MenuItem>
+                          <MenuItem value="boolean">Yes / No</MenuItem>
+                          <MenuItem value="select">Select (from list)</MenuItem>
                         </Select>
                       </FormControl>
+                    </Stack>
+                    {fieldDef.type === 'select' ? (
+                      <OptionsTextField
+                        label="Options (one per line)"
+                        minRows={2}
+                        maxRows={8}
+                        options={fieldDef.options ?? []}
+                        onOptionsChange={(opts) => updateFieldDef(fieldIndex, (current) => ({ ...current, options: opts }))}
+                      />
                     ) : null}
+                    <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
+                      <Chip label={fieldDef.required ? 'Required' : 'Optional'} color={fieldDef.required ? 'warning' : 'default'} size="small" />
+                      <Stack direction="row" spacing={1}>
+                        <Button size="small" onClick={() => updateFieldDef(fieldIndex, (current) => ({ ...current, required: !current.required }))}>
+                          Toggle required
+                        </Button>
+                        <Button size="small" color="error" onClick={() => removeFieldDef(fieldIndex)}>
+                          Delete
+                        </Button>
+                      </Stack>
+                    </Stack>
                   </Stack>
+                </Paper>
+              ))}
 
-                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                    <Typography variant="body2" fontWeight={700}>Conditions</Typography>
-                    <Button
-                      size="small"
-                      onClick={() => updateRule(ruleIndex, (current) => ({ ...current, conditions: [...current.conditions, emptyCondition()] }))}
-                    >
-                      Add condition
-                    </Button>
-                  </Stack>
-                  {rule.conditions.map((condition, conditionIndex) => (
-                    <Stack key={`${rule.id ?? ruleIndex}-cond-${conditionIndex}`} direction={{ xs: 'column', md: 'row' }} spacing={1}>
-                      {conditionIndex > 0 ? (
+              <Divider />
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={800}>Custom Rules</Typography>
+                  <Typography variant="body2" color="text.secondary">Define IF conditions and THEN actions without changing backend code.</Typography>
+                </Box>
+                <Button variant="outlined" onClick={addRule}>Add Rule</Button>
+              </Stack>
+
+              {(controlDraft?.custom_rules ?? []).map((rule, ruleIndex) => (
+                <Paper key={rule.id ?? `rule-${ruleIndex}`} sx={{ p: 1.5, bgcolor: themeColors.componentBg }}>
+                  <Stack spacing={1.2}>
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
+                      <TextField
+                        label="Rule Name"
+                        value={rule.name}
+                        onChange={(event) => updateRule(ruleIndex, (current) => ({ ...current, name: event.target.value }))}
+                        fullWidth
+                      />
+                      <FormControl fullWidth>
+                        <InputLabel>Scope</InputLabel>
+                        <Select
+                          label="Scope"
+                          value={rule.scope}
+                          onChange={(event) => updateRule(ruleIndex, (current) => ({ ...current, scope: event.target.value as CustomRule['scope'] }))}
+                        >
+                          <MenuItem value="global">Global</MenuItem>
+                          <MenuItem value="category">Per Category</MenuItem>
+                        </Select>
+                      </FormControl>
+                      {rule.scope === 'category' ? (
                         <FormControl fullWidth>
-                          <InputLabel>Join</InputLabel>
+                          <InputLabel>Category</InputLabel>
                           <Select
-                            label="Join"
-                            value={condition.logic}
-                            onChange={(event) => updateRule(ruleIndex, (current) => ({
-                              ...current,
-                              conditions: current.conditions.map((entry, idx) => idx === conditionIndex ? { ...entry, logic: event.target.value as RuleCondition['logic'] } : entry),
-                            }))}
+                            label="Category"
+                            value={rule.category ?? ''}
+                            onChange={(event) => updateRule(ruleIndex, (current) => ({ ...current, category: event.target.value || null }))}
                           >
-                            <MenuItem value="AND">AND</MenuItem>
-                            <MenuItem value="OR">OR</MenuItem>
+                            <MenuItem value=""><em>Select</em></MenuItem>
+                            {formOptions.category_options.map((category) => (
+                              <MenuItem key={category} value={category}>{category}</MenuItem>
+                            ))}
                           </Select>
                         </FormControl>
                       ) : null}
-                      <FormControl fullWidth>
-                        <InputLabel>Field</InputLabel>
-                        <Select
-                          label="Field"
-                          value={condition.field}
-                          onChange={(event) => updateRule(ruleIndex, (current) => ({
-                            ...current,
-                            conditions: current.conditions.map((entry, idx) => idx === conditionIndex ? { ...entry, field: event.target.value } : entry),
-                          }))}
-                        >
-                          {RULE_FIELD_OPTIONS.map((fieldName) => (
-                            <MenuItem key={fieldName} value={fieldName}>{fieldName}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      <FormControl fullWidth>
-                        <InputLabel>Operator</InputLabel>
-                        <Select
-                          label="Operator"
-                          value={condition.operator}
-                          onChange={(event) => updateRule(ruleIndex, (current) => ({
-                            ...current,
-                            conditions: current.conditions.map((entry, idx) => idx === conditionIndex ? { ...entry, operator: event.target.value as RuleCondition['operator'] } : entry),
-                          }))}
-                        >
-                          {RULE_OPERATOR_OPTIONS.map((operator) => (
-                            <MenuItem key={operator} value={operator}>{operator}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      <TextField
-                        fullWidth
-                        label="Value"
-                        value={String(condition.value ?? '')}
-                        onChange={(event) => updateRule(ruleIndex, (current) => ({
-                          ...current,
-                          conditions: current.conditions.map((entry, idx) => idx === conditionIndex ? { ...entry, value: event.target.value } : entry),
-                        }))}
-                      />
-                      <Button
-                        color="error"
-                        onClick={() => updateRule(ruleIndex, (current) => ({
-                          ...current,
-                          conditions: current.conditions.filter((_, idx) => idx !== conditionIndex),
-                        }))}
-                        disabled={rule.conditions.length <= 1}
-                      >
-                        Remove
-                      </Button>
                     </Stack>
-                  ))}
 
-                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                    <Typography variant="body2" fontWeight={700}>Actions</Typography>
-                    <Button
-                      size="small"
-                      onClick={() => updateRule(ruleIndex, (current) => ({ ...current, actions: [...current.actions, emptyAction()] }))}
-                    >
-                      Add action
-                    </Button>
-                  </Stack>
-                  {rule.actions.map((action, actionIndex) => (
-                    <Stack key={`${rule.id ?? ruleIndex}-action-${actionIndex}`} direction={{ xs: 'column', md: 'row' }} spacing={1}>
-                      <FormControl fullWidth>
-                        <InputLabel>Action Type</InputLabel>
-                        <Select
-                          label="Action Type"
-                          value={action.type}
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                      <Typography variant="body2" fontWeight={700}>Conditions</Typography>
+                      <Button
+                        size="small"
+                        onClick={() => updateRule(ruleIndex, (current) => ({ ...current, conditions: [...current.conditions, emptyCondition()] }))}
+                      >
+                        Add condition
+                      </Button>
+                    </Stack>
+                    {rule.conditions.map((condition, conditionIndex) => (
+                      <Stack key={`${rule.id ?? ruleIndex}-cond-${conditionIndex}`} direction={{ xs: 'column', md: 'row' }} spacing={1}>
+                        {conditionIndex > 0 ? (
+                          <FormControl fullWidth>
+                            <InputLabel>Join</InputLabel>
+                            <Select
+                              label="Join"
+                              value={condition.logic}
+                              onChange={(event) => updateRule(ruleIndex, (current) => ({
+                                ...current,
+                                conditions: current.conditions.map((entry, idx) => idx === conditionIndex ? { ...entry, logic: event.target.value as RuleCondition['logic'] } : entry),
+                              }))}
+                            >
+                              <MenuItem value="AND">AND</MenuItem>
+                              <MenuItem value="OR">OR</MenuItem>
+                            </Select>
+                          </FormControl>
+                        ) : null}
+                        <FormControl fullWidth>
+                          <InputLabel>Field</InputLabel>
+                          <Select
+                            label="Field"
+                            value={condition.field}
+                            onChange={(event) => updateRule(ruleIndex, (current) => ({
+                              ...current,
+                              conditions: current.conditions.map((entry, idx) => idx === conditionIndex ? { ...entry, field: event.target.value } : entry),
+                            }))}
+                          >
+                            {RULE_FIELD_OPTIONS.map((fieldName) => (
+                              <MenuItem key={fieldName} value={fieldName}>{fieldName}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <FormControl fullWidth>
+                          <InputLabel>Operator</InputLabel>
+                          <Select
+                            label="Operator"
+                            value={condition.operator}
+                            onChange={(event) => updateRule(ruleIndex, (current) => ({
+                              ...current,
+                              conditions: current.conditions.map((entry, idx) => idx === conditionIndex ? { ...entry, operator: event.target.value as RuleCondition['operator'] } : entry),
+                            }))}
+                          >
+                            {RULE_OPERATOR_OPTIONS.map((operator) => (
+                              <MenuItem key={operator} value={operator}>{operator}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <TextField
+                          fullWidth
+                          label="Value"
+                          value={String(condition.value ?? '')}
                           onChange={(event) => updateRule(ruleIndex, (current) => ({
                             ...current,
-                            actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, type: event.target.value as RuleAction['type'] } : entry),
+                            conditions: current.conditions.map((entry, idx) => idx === conditionIndex ? { ...entry, value: event.target.value } : entry),
                           }))}
+                        />
+                        <Button
+                          color="error"
+                          onClick={() => updateRule(ruleIndex, (current) => ({
+                            ...current,
+                            conditions: current.conditions.filter((_, idx) => idx !== conditionIndex),
+                          }))}
+                          disabled={rule.conditions.length <= 1}
                         >
-                          {RULE_ACTION_OPTIONS.map((actionType) => (
-                            <MenuItem key={actionType} value={actionType}>{actionType}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-            {action.type === 'notify_owner' ? (
-            <TextField fullWidth label="Action Value" value="" disabled helperText="No value needed." />
-            ) : action.type === 'status' ? (
-            <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                label="Status"
-                value={String(action.value ?? '')}
-                onChange={(event) => updateRule(ruleIndex, (current) => ({
-                    ...current,
-                    actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, value: event.target.value } : entry),
-                }))}
-                >
-                {['Active', 'Review', 'Urgent', 'Expired', 'Missing Expiry Info'].map((s) => (
-                    <MenuItem key={s} value={s}>{s}</MenuItem>
-                ))}
-                </Select>
-            </FormControl>
-            ) : action.type === 'priority' ? (
-            <FormControl fullWidth>
-                <InputLabel>Priority</InputLabel>
-                <Select
-                label="Priority"
-                value={String(action.value ?? '')}
-                onChange={(event) => updateRule(ruleIndex, (current) => ({
-                    ...current,
-                    actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, value: event.target.value } : entry),
-                }))}
-                >
-                {formOptions.priority_options.map((p) => (
-                    <MenuItem key={p} value={p}>{p}</MenuItem>
-                ))}
-                </Select>
-            </FormControl>
-            ) : action.type === 'anomaly_boost' ? (
-            <TextField
-                fullWidth
-                label="Boost amount"
-                type="number"
-                inputProps={{ min: 0, step: 1 }}
-                value={action.value === null ? '' : String(action.value)}
-                helperText="Added to anomaly score (e.g. 25)"
-                onChange={(event) => updateRule(ruleIndex, (current) => ({
-                ...current,
-                actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, value: Number(event.target.value) } : entry),
-                }))}
-            />
-            ) : (
-            <TextField
-                fullWidth
-                label="Flag label"
-                value={action.value === null ? '' : String(action.value)}
-                helperText="Text shown as a risk flag"
-                onChange={(event) => updateRule(ruleIndex, (current) => ({
-                ...current,
-                actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, value: event.target.value } : entry),
-                }))}
-            />
-            )}
+                          Remove
+                        </Button>
+                      </Stack>
+                    ))}
+
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                      <Typography variant="body2" fontWeight={700}>Actions</Typography>
                       <Button
-                        color="error"
-                        onClick={() => updateRule(ruleIndex, (current) => ({
-                          ...current,
-                          actions: current.actions.filter((_, idx) => idx !== actionIndex),
-                        }))}
-                        disabled={rule.actions.length <= 1}
+                        size="small"
+                        onClick={() => updateRule(ruleIndex, (current) => ({ ...current, actions: [...current.actions, emptyAction()] }))}
                       >
-                        Remove
+                        Add action
                       </Button>
                     </Stack>
-                  ))}
+                    {rule.actions.map((action, actionIndex) => (
+                      <Stack key={`${rule.id ?? ruleIndex}-action-${actionIndex}`} direction={{ xs: 'column', md: 'row' }} spacing={1}>
+                        <FormControl fullWidth>
+                          <InputLabel>Action Type</InputLabel>
+                          <Select
+                            label="Action Type"
+                            value={action.type}
+                            onChange={(event) => updateRule(ruleIndex, (current) => ({
+                              ...current,
+                              actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, type: event.target.value as RuleAction['type'] } : entry),
+                            }))}
+                          >
+                            {RULE_ACTION_OPTIONS.map((actionType) => (
+                              <MenuItem key={actionType} value={actionType}>{actionType}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        {action.type === 'notify_owner' ? (
+                          <TextField fullWidth label="Action Value" value="" disabled helperText="No value needed." />
+                        ) : action.type === 'status' ? (
+                          <FormControl fullWidth>
+                            <InputLabel>Status</InputLabel>
+                            <Select
+                              label="Status"
+                              value={String(action.value ?? '')}
+                              onChange={(event) => updateRule(ruleIndex, (current) => ({
+                                ...current,
+                                actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, value: event.target.value } : entry),
+                              }))}
+                            >
+                              {['Active', 'Review', 'Urgent', 'Expired', 'Missing Expiry Info'].map((s) => (
+                                <MenuItem key={s} value={s}>{s}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        ) : action.type === 'priority' ? (
+                          <FormControl fullWidth>
+                            <InputLabel>Priority</InputLabel>
+                            <Select
+                              label="Priority"
+                              value={String(action.value ?? '')}
+                              onChange={(event) => updateRule(ruleIndex, (current) => ({
+                                ...current,
+                                actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, value: event.target.value } : entry),
+                              }))}
+                            >
+                              {formOptions.priority_options.map((p) => (
+                                <MenuItem key={p} value={p}>{p}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        ) : action.type === 'anomaly_boost' ? (
+                          <TextField
+                            fullWidth
+                            label="Boost amount"
+                            type="number"
+                            inputProps={{ min: 0, step: 1 }}
+                            value={action.value === null ? '' : String(action.value)}
+                            helperText="Added to anomaly score (e.g. 25)"
+                            onChange={(event) => updateRule(ruleIndex, (current) => ({
+                              ...current,
+                              actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, value: Number(event.target.value) } : entry),
+                            }))}
+                          />
+                        ) : (
+                          <TextField
+                            fullWidth
+                            label="Flag label"
+                            value={action.value === null ? '' : String(action.value)}
+                            helperText="Text shown as a risk flag"
+                            onChange={(event) => updateRule(ruleIndex, (current) => ({
+                              ...current,
+                              actions: current.actions.map((entry, idx) => idx === actionIndex ? { ...entry, value: event.target.value } : entry),
+                            }))}
+                          />
+                        )}
+                        <Button
+                          color="error"
+                          onClick={() => updateRule(ruleIndex, (current) => ({
+                            ...current,
+                            actions: current.actions.filter((_, idx) => idx !== actionIndex),
+                          }))}
+                          disabled={rule.actions.length <= 1}
+                        >
+                          Remove
+                        </Button>
+                      </Stack>
+                    ))}
 
-                  <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
-                    <Chip label={rule.enabled ? 'Enabled' : 'Disabled'} color={rule.enabled ? 'success' : 'default'} size="small" />
-                    <Stack direction="row" spacing={1}>
-                      <Button size="small" onClick={() => updateRule(ruleIndex, (current) => ({ ...current, enabled: !current.enabled }))}>
-                        {rule.enabled ? 'Disable' : 'Enable'}
-                      </Button>
-                      <Button size="small" color="error" onClick={() => removeRule(ruleIndex)}>
-                        Delete Rule
-                      </Button>
+                    <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
+                      <Chip label={rule.enabled ? 'Enabled' : 'Disabled'} color={rule.enabled ? 'success' : 'default'} size="small" />
+                      <Stack direction="row" spacing={1}>
+                        <Button size="small" onClick={() => updateRule(ruleIndex, (current) => ({ ...current, enabled: !current.enabled }))}>
+                          {rule.enabled ? 'Disable' : 'Enable'}
+                        </Button>
+                        <Button size="small" color="error" onClick={() => removeRule(ruleIndex)}>
+                          Delete Rule
+                        </Button>
+                      </Stack>
                     </Stack>
                   </Stack>
-                </Stack>
-              </Paper>
-            ))}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setControlDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveControls} disabled={controlSaveBusy || !controlDraft}>
-            {controlSaveBusy ? 'Saving...' : 'Save controls'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <UserManagementDialog
-        open={usersDialogOpen}
-        onClose={() => setUsersDialogOpen(false)}
-        users={usersList}
-        loading={usersLoading}
-        error={usersError}
-        currentUserId={user.id}
-        onRoleChange={handleRoleChange}
-        onCreateUser={handleCreateUser}
-      />
-      <ChangePasswordDialog
-        open={pwDialogOpen}
-        onClose={() => setPwDialogOpen(false)}
-        onSubmit={handleChangePassword}
-        busy={pwBusy}
-        error={pwError}
-        success={pwSuccess}
-      />
-    </Box>
+                </Paper>
+              ))}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setControlDialogOpen(false)}>Cancel</Button>
+            <Button variant="contained" onClick={handleSaveControls} disabled={controlSaveBusy || !controlDraft}>
+              {controlSaveBusy ? 'Saving...' : 'Save controls'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        <UserManagementDialog
+          open={usersDialogOpen}
+          onClose={() => setUsersDialogOpen(false)}
+          users={usersList}
+          loading={usersLoading}
+          error={usersError}
+          currentUserId={user.id}
+          onRoleChange={handleRoleChange}
+          onCreateUser={handleCreateUser}
+          onDeleteUser={handleDeleteUser}
+        />
+        <ChangePasswordDialog
+          open={pwDialogOpen}
+          onClose={() => setPwDialogOpen(false)}
+          onSubmit={handleChangePassword}
+          busy={pwBusy}
+          error={pwError}
+          success={pwSuccess}
+        />
+      </Box>
     </ThemeProvider>
   );
 }
@@ -1455,7 +1467,6 @@ function LoginScreen({ error, onSubmit }: { error: string; onSubmit: (event: Rea
             <Avatar sx={{ bgcolor: 'secondary.main', color: 'background.default' }}><LockOutlinedIcon /></Avatar>
             <Box>
               <Typography variant="h5" fontWeight={800}>License Lifecycle Hub</Typography>
-              <Typography variant="body2" color="text.secondary">Sign in via Microsoft Single Sign-On or Demo credentials.</Typography>
             </Box>
           </Stack>
 
@@ -1468,10 +1479,10 @@ function LoginScreen({ error, onSubmit }: { error: string; onSubmit: (event: Rea
               onClick={() => handleKeycloakLogin('microsoft')}
               startIcon={
                 <svg width="18" height="18" viewBox="0 0 23 23">
-                  <path fill="#f35325" d="M1 1h10v10H1z"/>
-                  <path fill="#81bc06" d="M12 1h10v10H12z"/>
-                  <path fill="#05a6f0" d="M1 12h10v10H1z"/>
-                  <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                  <path fill="#f35325" d="M1 1h10v10H1z" />
+                  <path fill="#81bc06" d="M12 1h10v10H12z" />
+                  <path fill="#05a6f0" d="M1 12h10v10H1z" />
+                  <path fill="#ffba08" d="M12 12h10v10H12z" />
                 </svg>
               }
               sx={{ py: 1.2, fontWeight: 700, textTransform: 'none' }}
@@ -1481,7 +1492,7 @@ function LoginScreen({ error, onSubmit }: { error: string; onSubmit: (event: Rea
           </Stack>
 
           <Divider sx={{ my: 1 }}>
-            <Typography variant="caption" color="text.secondary">OR DEMO CREDENTIALS</Typography>
+            <Typography variant="caption" color="text.secondary">OR USER CREDENTIALS</Typography>
           </Divider>
 
           <TextField name="email" label="Username or Email" defaultValue="admin" fullWidth size="small" />
@@ -1495,23 +1506,23 @@ function LoginScreen({ error, onSubmit }: { error: string; onSubmit: (event: Rea
 }
 
 const TILE_PALETTE_DARK = [
-  { bg: 'rgba(99, 179, 237, 0.15)',  fg: '#93c5fd' }, // Total — blue
+  { bg: 'rgba(99, 179, 237, 0.15)', fg: '#93c5fd' }, // Total — blue
   { bg: 'rgba(248, 113, 113, 0.15)', fg: '#fca5a5' }, // Expired — red
-  { bg: 'rgba(251, 146, 60, 0.15)',  fg: '#fdba74' }, // Urgent — orange
-  { bg: 'rgba(250, 204, 21, 0.15)',  fg: '#fde047' }, // Missing — yellow
-  { bg: 'rgba(74, 222, 128, 0.15)',  fg: '#86efac' }, // Active — green
+  { bg: 'rgba(251, 146, 60, 0.15)', fg: '#fdba74' }, // Urgent — orange
+  { bg: 'rgba(250, 204, 21, 0.15)', fg: '#fde047' }, // Missing — yellow
+  { bg: 'rgba(74, 222, 128, 0.15)', fg: '#86efac' }, // Active — green
   { bg: 'rgba(167, 139, 250, 0.15)', fg: '#c4b5fd' }, // Review — purple
-  { bg: 'rgba(56, 189, 248, 0.15)',  fg: '#7dd3fc' }, // Annual cost — sky
+  { bg: 'rgba(56, 189, 248, 0.15)', fg: '#7dd3fc' }, // Annual cost — sky
 ];
 
 const TILE_PALETTE_LIGHT = [
-  { bg: 'rgba(59, 130, 246, 0.10)',  fg: '#1d4ed8' }, // Total — blue
-  { bg: 'rgba(220, 38, 38, 0.10)',   fg: '#b91c1c' }, // Expired — red
-  { bg: 'rgba(234, 88, 12, 0.10)',   fg: '#c2410c' }, // Urgent — orange
-  { bg: 'rgba(202, 138, 4, 0.10)',   fg: '#a16207' }, // Missing — yellow
-  { bg: 'rgba(22, 163, 74, 0.10)',   fg: '#15803d' }, // Active — green
-  { bg: 'rgba(109, 40, 217, 0.10)',  fg: '#7c3aed' }, // Review — purple
-  { bg: 'rgba(2, 132, 199, 0.10)',   fg: '#0369a1' }, // Annual cost — sky
+  { bg: 'rgba(59, 130, 246, 0.10)', fg: '#1d4ed8' }, // Total — blue
+  { bg: 'rgba(220, 38, 38, 0.10)', fg: '#b91c1c' }, // Expired — red
+  { bg: 'rgba(234, 88, 12, 0.10)', fg: '#c2410c' }, // Urgent — orange
+  { bg: 'rgba(202, 138, 4, 0.10)', fg: '#a16207' }, // Missing — yellow
+  { bg: 'rgba(22, 163, 74, 0.10)', fg: '#15803d' }, // Active — green
+  { bg: 'rgba(109, 40, 217, 0.10)', fg: '#7c3aed' }, // Review — purple
+  { bg: 'rgba(2, 132, 199, 0.10)', fg: '#0369a1' }, // Annual cost — sky
 ];
 
 function SummaryTile({ card, index = 0 }: { card: SummaryCard; index?: number }) {
@@ -1933,6 +1944,7 @@ function UserManagementDialog({
   currentUserId,
   onRoleChange,
   onCreateUser,
+  onDeleteUser,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1942,6 +1954,7 @@ function UserManagementDialog({
   currentUserId: number;
   onRoleChange: (userId: number, role: string) => void;
   onCreateUser: (payload: { email: string; password: string; role: string; full_name: string }) => Promise<void>;
+  onDeleteUser: (userId: number) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -2027,6 +2040,7 @@ function UserManagementDialog({
                     <TableCell sx={{ fontWeight: 800 }}>Email</TableCell>
                     <TableCell sx={{ fontWeight: 800 }}>Registered</TableCell>
                     <TableCell sx={{ fontWeight: 800 }}>Access Level</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }} align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -2058,6 +2072,24 @@ function UserManagementDialog({
                             <MenuItem value="viewer">Viewer</MenuItem>
                           </Select>
                         </FormControl>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Tooltip title={u.id === currentUserId ? "Cannot delete your own account" : "Delete user"}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              disabled={u.id === currentUserId}
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to delete user "${u.full_name || u.email}"?`)) {
+                                  onDeleteUser(u.id);
+                                }
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))}

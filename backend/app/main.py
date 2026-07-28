@@ -440,6 +440,21 @@ def create_user(
     return UserRead.model_validate(new_user)
 
 
+@app.delete("/api/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    if user_id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete your own user account")
+    target_user = db.query(User).filter(User.id == user_id).one_or_none()
+    if target_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    db.delete(target_user)
+    db.commit()
+
+
 @app.get("/api/licenses", response_model=list[LicenseRead])
 def list_licenses(
     query: str | None = None,

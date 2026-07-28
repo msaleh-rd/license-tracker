@@ -86,6 +86,10 @@ export async function createUser(payload: { email: string; password: string; rol
   return data;
 }
 
+export async function deleteUser(userId: number) {
+  await api.delete(`/api/users/${userId}`);
+}
+
 export async function changePassword(currentPassword: string, newPassword: string) {
   const { data } = await api.patch<{ detail: string }>('/api/auth/change-password', {
     current_password: currentPassword,
