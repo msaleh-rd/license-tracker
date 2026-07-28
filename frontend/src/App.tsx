@@ -2,6 +2,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { ThemeProvider, type PaletteMode, useTheme } from '@mui/material/styles';
 import {
   Alert,
+  AlertTitle,
   AppBar,
   Avatar,
   Box,
@@ -58,7 +59,7 @@ import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { changePassword, createUser, deleteLicense, deleteUser, exportWorkbook, getAuditLogs, getCategories, getControlSettings, getDashboard, getInsights, getLicenses, getMe, getKeycloakConfig, getUsers, hydrateAuthToken, login, saveLicense, setAuthToken, updateControlSettings, updateUserRole, uploadWorkbook } from './api';
 import { initKeycloak, isKeycloakAuthenticated, loginWithKeycloak, logoutKeycloak } from './keycloak';
-import { EMPTY_LICENSE_FORM, type AuditLog, type ControlSettings, type CustomFieldDefinition, type CustomRule, type DashboardResponse, type HeatmapCell, type LicenseFormValues, type LicenseItem, type RiskItem, type RuleAction, type RuleCondition, type SummaryCard, type User } from './types';
+import { EMPTY_LICENSE_FORM, type AuditLog, type ControlSettings, type CustomFieldDefinition, type CustomRule, type DashboardResponse, type HeatmapCell, type ImportResult, type LicenseFormValues, type LicenseItem, type RiskItem, type RuleAction, type RuleCondition, type SummaryCard, type User } from './types';
 
 type SortKey = 'days_to_expiry' | 'utilization_percent' | 'annual_cost' | 'priority' | 'status';
 
@@ -223,7 +224,8 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [deleteCandidate, setDeleteCandidate] = useState<LicenseItem | null>(null);
-  const [importNotice, setImportNotice] = useState<string>('');
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importDetailsOpen, setImportDetailsOpen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [currencyCode, setCurrencyCode] = useState(() => localStorage.getItem('license_tracker_currency') || 'USD');
   const [themeMode, setThemeMode] = useState<PaletteMode>(() => (localStorage.getItem('license_tracker_theme') as PaletteMode) || 'dark');
@@ -591,7 +593,7 @@ function App() {
     setImportBusy(true);
     try {
       const result = await uploadWorkbook(file);
-      setImportNotice(`Imported ${result.imported}, updated ${result.updated}, skipped ${result.skipped}. ${result.warnings.join(' ')}`.trim());
+      setImportResult(result);
       await bootstrap();
     } finally {
       setImportBusy(false);
@@ -723,7 +725,23 @@ function App() {
                 <Chip label={`${dashboard?.alerts.length ?? 0} alerts`} color="error" />
               </Stack>
             </Stack>
-            {importNotice ? <Alert severity="info" sx={{ mt: 2 }}>{importNotice}</Alert> : null}
+            {importResult ? (
+              <Alert
+                severity={importResult.skipped > 0 ? 'warning' : importResult.warnings.length > 0 ? 'info' : 'success'}
+                onClose={() => setImportResult(null)}
+                action={
+                  importResult.warnings.length > 0 ? (
+                    <Button color="inherit" size="small" onClick={() => setImportDetailsOpen(true)} sx={{ fontWeight: 700 }}>
+                      View Log ({importResult.warnings.length})
+                    </Button>
+                  ) : undefined
+                }
+                sx={{ mt: 2 }}
+              >
+                <AlertTitle sx={{ fontWeight: 700, mb: 0.5 }}>Import Completed</AlertTitle>
+                Imported <strong>{importResult.imported}</strong> new records, updated <strong>{importResult.updated}</strong>, skipped <strong>{importResult.skipped}</strong>.
+              </Alert>
+            ) : null}
           </Paper>
 
           <Box sx={{ display: 'flex', gap: 2.5, mb: 2, flexWrap: 'wrap' }}>
@@ -1429,6 +1447,35 @@ function App() {
           error={pwError}
           success={pwSuccess}
         />
+        <Dialog open={importDetailsOpen} onClose={() => setImportDetailsOpen(false)} maxWidth="md" fullWidth>
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Avatar sx={{ bgcolor: 'warning.main', color: 'background.default' }}>
+                <WarningAmberIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6" fontWeight={800}>Import Warnings & Log Details</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {importResult?.warnings.length ?? 0} detail message(s) generated during import
+                </Typography>
+              </Box>
+            </Stack>
+          </DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={1.5}>
+              {(importResult?.warnings ?? []).map((msg, idx) => (
+                <Paper key={idx} variant="outlined" sx={{ p: 1.5, bgcolor: themeMode === 'dark' ? 'rgba(15, 23, 42, 0.6)' : '#f8fafc' }}>
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-word', fontSize: '0.85rem' }}>
+                    <strong>#{idx + 1}:</strong> {msg}
+                  </Typography>
+                </Paper>
+              ))}
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button onClick={() => setImportDetailsOpen(false)} variant="outlined">Close</Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </ThemeProvider>
   );
