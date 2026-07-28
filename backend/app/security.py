@@ -5,6 +5,7 @@ from typing import Any
 
 import bcrypt
 import jwt
+from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -15,6 +16,14 @@ from .settings import settings
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+_jwks_clients: dict[str, PyJWKClient] = {}
+
+
+def get_jwks_client(jwks_uri: str) -> PyJWKClient:
+    if jwks_uri not in _jwks_clients:
+        _jwks_clients[jwks_uri] = PyJWKClient(jwks_uri, cache_keys=True)
+    return _jwks_clients[jwks_uri]
 
 
 def hash_password(password: str) -> str:
@@ -38,6 +47,19 @@ def decode_access_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token") from exc
 
 
+def decode_keycloak_token(token: str) -> dict[str, Any]:
+    keycloak_url = settings.keycloak_url.rstrip("/")
+    jwks_uri = f"{keycloak_url}/realms/{settings.keycloak_realm}/protocol/openid-connect/certs"
+    client = get_jwks_client(jwks_uri)
+    signing_key = client.get_signing_key_from_jwt(token)
+    return jwt.decode(
+        token,
+        signing_key.key,
+        algorithms=["RS256", "HS256"],
+        options={"verify_aud": False, "verify_iss": False},
+    )
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
@@ -45,7 +67,61 @@ def get_current_user(
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
-    payload = decode_access_token(credentials.credentials)
+    token = credentials.credentials
+
+    # 1. Try Keycloak JWT token validation if Keycloak is enabled
+    if settings.keycloak_enabled:
+        try:
+            kc_payload = decode_keycloak_token(token)
+            email = (
+                kc_payload.get("email")
+                or kc_payload.get("preferred_username")
+                or kc_payload.get("upn")
+                or kc_payload.get("sub")
+            )
+            if not email:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Keycloak token: missing email claim")
+
+            full_name = (
+                kc_payload.get("name")
+                or f"{kc_payload.get('given_name', '')} {kc_payload.get('family_name', '')}".strip()
+                or email.split("@")[0]
+            )
+
+            realm_roles = kc_payload.get("realm_access", {}).get("roles", [])
+            client_roles = kc_payload.get("resource_access", {}).get(settings.keycloak_client_id, {}).get("roles", [])
+            combined_roles = set(realm_roles + client_roles)
+
+            role = "viewer"
+            if "admin" in combined_roles or "superadmin" in combined_roles:
+                role = "admin"
+            elif "ops" in combined_roles or "operator" in combined_roles or "manager" in combined_roles:
+                role = "ops"
+
+            user = db.query(User).filter(User.email == email).one_or_none()
+            if user is None:
+                user = User(
+                    email=email,
+                    password_hash=hash_password("keycloak_sso_user"),
+                    role=role,
+                    full_name=full_name,
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            elif user.full_name != full_name:
+                user.full_name = full_name
+                db.commit()
+                db.refresh(user)
+
+            return user
+        except Exception as exc:
+            import logging
+            logging.warning("Keycloak token decode failed: %s", exc)
+            pass
+
+    # 2. Local token verification fallback
+    payload = decode_access_token(token)
     user = db.query(User).filter(User.email == payload.get("sub")).one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
@@ -58,4 +134,4 @@ def require_roles(*allowed_roles: str):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
         return user
 
-    return dependency
+    return dependency

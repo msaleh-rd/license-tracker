@@ -352,6 +352,16 @@ def health() -> HealthResponse:
     return HealthResponse(status="ok")
 
 
+@app.get("/api/auth/keycloak-config")
+def keycloak_config() -> dict[str, Any]:
+    return {
+        "enabled": settings.keycloak_enabled,
+        "url": settings.keycloak_url,
+        "realm": settings.keycloak_realm,
+        "client_id": settings.keycloak_client_id,
+    }
+
+
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     user = db.query(User).filter(User.email == payload.email).one_or_none()

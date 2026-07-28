@@ -53,7 +53,8 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RechartsTooltip, X
 
 import { createAppTheme, getThemeColors, PALETTE, PALETTE_LIGHT } from './theme';
 
-import { deleteLicense, exportWorkbook, getAuditLogs, getCategories, getControlSettings, getDashboard, getInsights, getLicenses, getMe, hydrateAuthToken, login, saveLicense, setAuthToken, updateControlSettings, uploadWorkbook } from './api';
+import { deleteLicense, exportWorkbook, getAuditLogs, getCategories, getControlSettings, getDashboard, getInsights, getLicenses, getMe, getKeycloakConfig, hydrateAuthToken, login, saveLicense, setAuthToken, updateControlSettings, uploadWorkbook } from './api';
+import { initKeycloak, isKeycloakAuthenticated, loginWithKeycloak, logoutKeycloak } from './keycloak';
 import { EMPTY_LICENSE_FORM, type AuditLog, type ControlSettings, type CustomFieldDefinition, type CustomRule, type DashboardResponse, type HeatmapCell, type LicenseFormValues, type LicenseItem, type RiskItem, type RuleAction, type RuleCondition, type SummaryCard, type User } from './types';
 
 type SortKey = 'days_to_expiry' | 'utilization_percent' | 'annual_cost' | 'priority' | 'status';
@@ -250,13 +251,29 @@ function App() {
   }, [currencyCode, formOptions.currency_options]);
 
   useEffect(() => {
-    const token = hydrateAuthToken();
-    setTokenReady(true);
-    if (!token) {
-      setLoading(false);
-      return;
+    async function init() {
+      try {
+        const config = await getKeycloakConfig();
+        if (config.enabled) {
+          const authenticated = await initKeycloak(config);
+          if (authenticated) {
+            setTokenReady(true);
+            void bootstrap();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('SSO Initialization Error:', err);
+      }
+      const token = hydrateAuthToken();
+      setTokenReady(true);
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      void bootstrap();
     }
-    void bootstrap();
+    void init();
   }, []);
 
   useEffect(() => {
@@ -415,6 +432,9 @@ function App() {
     setLicenses([]);
     setAuditLogs([]);
     setCategories([]);
+    if (isKeycloakAuthenticated()) {
+      void logoutKeycloak();
+    }
   }
 
   function openCreateDrawer() {
@@ -1308,21 +1328,59 @@ function LoadingScreen() {
 }
 
 function LoginScreen({ error, onSubmit }: { error: string; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
+  const [kcLoading, setKcLoading] = useState(false);
+
+  const handleKeycloakLogin = async (idpHint?: string) => {
+    try {
+      setKcLoading(true);
+      await loginWithKeycloak(idpHint);
+    } catch (err) {
+      console.error(err);
+      setKcLoading(false);
+    }
+  };
+
   return (
     <Box className="login-screen">
-      <Paper className="login-card" sx={{ p: 4 }}>
+      <Paper className="login-card" sx={{ p: 4, maxWidth: 440, width: '100%' }}>
         <Stack spacing={2.5} component="form" onSubmit={onSubmit}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <Avatar sx={{ bgcolor: 'secondary.main', color: 'background.default' }}><LockOutlinedIcon /></Avatar>
             <Box>
-              <Typography variant="h4" fontWeight={800}>License Lifecycle Hub</Typography>
-              <Typography variant="body2" color="text.secondary">Sign in with your demo role to inspect the dashboard.</Typography>
+              <Typography variant="h5" fontWeight={800}>License Lifecycle Hub</Typography>
+              <Typography variant="body2" color="text.secondary">Sign in via Microsoft Single Sign-On or Demo credentials.</Typography>
             </Box>
           </Stack>
-          <TextField name="email" label="Email" defaultValue="admin@example.com" fullWidth />
-          <TextField name="password" label="Password" type="password" defaultValue="Admin123!" fullWidth />
+
+          <Stack spacing={1.5}>
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              disabled={kcLoading}
+              onClick={() => handleKeycloakLogin('microsoft')}
+              startIcon={
+                <svg width="18" height="18" viewBox="0 0 23 23">
+                  <path fill="#f35325" d="M1 1h10v10H1z"/>
+                  <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                  <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                  <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                </svg>
+              }
+              sx={{ py: 1.2, fontWeight: 700, textTransform: 'none' }}
+            >
+              Sign in with Microsoft Outlook
+            </Button>
+          </Stack>
+
+          <Divider sx={{ my: 1 }}>
+            <Typography variant="caption" color="text.secondary">OR DEMO CREDENTIALS</Typography>
+          </Divider>
+
+          <TextField name="email" label="Email" defaultValue="admin@example.com" fullWidth size="small" />
+          <TextField name="password" label="Password" type="password" defaultValue="Admin123!" fullWidth size="small" />
           {error ? <Alert severity="error">{error}</Alert> : null}
-          <Button type="submit" variant="contained" size="large">Enter dashboard</Button>
+          <Button type="submit" variant="contained" size="large" color="secondary">Enter dashboard</Button>
           <Typography variant="caption" color="text.secondary">Demo accounts: admin@example.com / Admin123!, ops@example.com / Ops123!, viewer@example.com / View123!</Typography>
         </Stack>
       </Paper>

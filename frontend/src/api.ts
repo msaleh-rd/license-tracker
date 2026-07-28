@@ -12,8 +12,19 @@ import type {
   User,
 } from './types';
 
+import type { KeycloakConfig } from './keycloak';
+import { getValidKeycloakToken } from './keycloak';
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '',
+});
+
+api.interceptors.request.use(async (config) => {
+  const token = (await getValidKeycloakToken()) ?? localStorage.getItem('license_tracker_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export function setAuthToken(token: string | null) {
@@ -33,6 +44,21 @@ export function hydrateAuthToken() {
   }
   return token;
 }
+
+export async function getKeycloakConfig(): Promise<KeycloakConfig> {
+  try {
+    const { data } = await api.get<KeycloakConfig>('/api/auth/keycloak-config');
+    return data;
+  } catch {
+    return {
+      enabled: true,
+      url: 'https://identity.vertodemos.com:8443',
+      realm: 'vertowave',
+      client_id: 'vertowave',
+    };
+  }
+}
+
 
 export async function login(payload: LoginRequest) {
   const { data } = await api.post<TokenResponse>('/api/auth/login', payload);
