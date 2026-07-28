@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openpyxl import Workbook
-from sqlalchemy import inspect, or_, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.orm import Session
 
 from .db import Base, SessionLocal, engine, get_db
@@ -193,9 +193,12 @@ def seed_users(db: Session) -> None:
         (settings.demo_viewer_email, settings.demo_viewer_password, "viewer", "Read Only User"),
     ]
     for email, password, role, full_name in seed_data:
-        existing = db.query(User).filter(User.email == email).one_or_none()
+        if not email or not email.strip():
+            continue
+        clean_email = email.strip()
+        existing = db.query(User).filter(func.lower(User.email) == clean_email.lower()).first()
         if existing is None:
-            db.add(User(email=email, password_hash=hash_password(password), role=role, full_name=full_name))
+            db.add(User(email=clean_email, password_hash=hash_password(password), role=role, full_name=full_name))
     db.commit()
 
 
@@ -367,7 +370,8 @@ def keycloak_config() -> dict[str, Any]:
 
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    user = db.query(User).filter(User.email == payload.email).one_or_none()
+    clean_email = payload.email.strip()
+    user = db.query(User).filter(func.lower(User.email) == clean_email.lower()).first()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     token = create_access_token(subject=user.email, role=user.role)
@@ -425,14 +429,15 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin")),
 ) -> UserRead:
-    existing = db.query(User).filter(User.email == payload.email).one_or_none()
+    clean_email = payload.email.strip()
+    existing = db.query(User).filter(func.lower(User.email) == clean_email.lower()).first()
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A user with that username/email already exists")
     new_user = User(
-        email=payload.email,
+        email=clean_email,
         password_hash=hash_password(payload.password),
         role=payload.role,
-        full_name=payload.full_name or payload.email,
+        full_name=payload.full_name or clean_email,
     )
     db.add(new_user)
     db.commit()

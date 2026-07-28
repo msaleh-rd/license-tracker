@@ -8,6 +8,7 @@ import jwt
 from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .db import get_db
@@ -120,10 +121,11 @@ def get_current_user(
             elif "ops" in combined_roles or "operator" in combined_roles or "manager" in combined_roles:
                 role = "ops"
 
-            user = db.query(User).filter(User.email == email).one_or_none()
+            clean_email = email.strip()
+            user = db.query(User).filter(func.lower(User.email) == clean_email.lower()).first()
             if user is None:
                 user = User(
-                    email=email,
+                    email=clean_email,
                     password_hash=hash_password("keycloak_sso_user"),
                     role=role,
                     full_name=full_name,
