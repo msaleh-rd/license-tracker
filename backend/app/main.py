@@ -32,6 +32,7 @@ from .schemas import (
     LoginRequest,
     TokenResponse,
     UserRead,
+    UserRoleUpdate,
 )
 from .email_service import notify_owner_alert, notify_owner_update, notify_status_change, notify_new_email_subscription
 from .security import create_access_token, get_current_user, hash_password, require_roles, verify_password
@@ -374,6 +375,33 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 @app.get("/api/auth/me", response_model=UserRead)
 def me(current_user: User = Depends(get_current_user)) -> UserRead:
     return UserRead.model_validate(current_user)
+
+
+@app.get("/api/users", response_model=list[UserRead])
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+) -> list[UserRead]:
+    _ = current_user
+    users = db.query(User).order_by(User.id.asc()).all()
+    return [UserRead.model_validate(u) for u in users]
+
+
+@app.patch("/api/users/{user_id}/role", response_model=UserRead)
+def update_user_role(
+    user_id: int,
+    payload: UserRoleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+) -> UserRead:
+    target_user = db.query(User).filter(User.id == user_id).one_or_none()
+    if target_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    target_user.role = payload.role
+    db.commit()
+    db.refresh(target_user)
+    return UserRead.model_validate(target_user)
 
 
 @app.get("/api/licenses", response_model=list[LicenseRead])

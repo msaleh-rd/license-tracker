@@ -55,6 +55,12 @@ class UserRead(BaseModel):
     email: str
     role: str
     full_name: str
+    created_at: datetime | None = None
+
+
+class UserRoleUpdate(BaseModel):
+    role: str = Field(pattern=r"^(admin|ops|viewer)$")
+
 
 
 class LicenseBase(BaseModel):

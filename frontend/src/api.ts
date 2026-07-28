@@ -71,6 +71,16 @@ export async function getMe() {
   return data;
 }
 
+export async function getUsers() {
+  const { data } = await api.get<User[]>('/api/users');
+  return data;
+}
+
+export async function updateUserRole(userId: number, role: string) {
+  const { data } = await api.patch<User>(`/api/users/${userId}/role`, { role });
+  return data;
+}
+
 export async function getDashboard() {
   const { data } = await api.get<DashboardResponse>('/api/dashboard');
   return data;

@@ -53,7 +53,8 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RechartsTooltip, X
 
 import { createAppTheme, getThemeColors, PALETTE, PALETTE_LIGHT } from './theme';
 
-import { deleteLicense, exportWorkbook, getAuditLogs, getCategories, getControlSettings, getDashboard, getInsights, getLicenses, getMe, getKeycloakConfig, hydrateAuthToken, login, saveLicense, setAuthToken, updateControlSettings, uploadWorkbook } from './api';
+import GroupIcon from '@mui/icons-material/Group';
+import { deleteLicense, exportWorkbook, getAuditLogs, getCategories, getControlSettings, getDashboard, getInsights, getLicenses, getMe, getKeycloakConfig, getUsers, hydrateAuthToken, login, saveLicense, setAuthToken, updateControlSettings, updateUserRole, uploadWorkbook } from './api';
 import { initKeycloak, isKeycloakAuthenticated, loginWithKeycloak, logoutKeycloak } from './keycloak';
 import { EMPTY_LICENSE_FORM, type AuditLog, type ControlSettings, type CustomFieldDefinition, type CustomRule, type DashboardResponse, type HeatmapCell, type LicenseFormValues, type LicenseItem, type RiskItem, type RuleAction, type RuleCondition, type SummaryCard, type User } from './types';
 
@@ -228,6 +229,10 @@ function App() {
   const [controlDraft, setControlDraft] = useState<ControlSettings | null>(null);
   const [controlSaveBusy, setControlSaveBusy] = useState(false);
   const [controlError, setControlError] = useState('');
+  const [usersList, setUsersList] = useState<User[]>([]);
+  const [usersDialogOpen, setUsersDialogOpen] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState('');
 
   const appTheme = useMemo(() => createAppTheme(themeMode), [themeMode]);
 
@@ -386,6 +391,35 @@ function App() {
       }
       return { ...current, custom_field_definitions: (current.custom_field_definitions ?? []).filter((_, index) => index !== fieldIndex) };
     });
+  }
+
+  async function openUsersDialog() {
+    setUsersError('');
+    setUsersDialogOpen(true);
+    try {
+      setUsersLoading(true);
+      const list = await getUsers();
+      setUsersList(list);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail;
+      setUsersError(typeof msg === 'string' ? msg : 'Failed to fetch user list.');
+    } finally {
+      setUsersLoading(false);
+    }
+  }
+
+  async function handleRoleChange(targetUserId: number, newRole: string) {
+    try {
+      setUsersError('');
+      const updated = await updateUserRole(targetUserId, newRole);
+      setUsersList((current) => current.map((u) => (u.id === targetUserId ? updated : u)));
+      if (user && user.id === targetUserId) {
+        setUser(updated);
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail;
+      setUsersError(typeof msg === 'string' ? msg : 'Failed to update user role.');
+    }
   }
 
   async function handleSaveControls() {
@@ -581,6 +615,11 @@ function App() {
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Chip icon={<ShieldIcon />} label={user.role} color={user.role === 'admin' ? 'success' : user.role === 'ops' ? 'warning' : 'default'} variant="outlined" />
             <Chip label={user.email} variant="outlined" />
+            {user.role === 'admin' && (
+              <Button startIcon={<GroupIcon />} onClick={openUsersDialog} variant="outlined">
+                Users
+              </Button>
+            )}
             <Button startIcon={<TuneIcon />} onClick={openControlDialog} variant="outlined" disabled={user.role === 'viewer'}>
               Controls
             </Button>
@@ -1310,6 +1349,15 @@ function App() {
           </Button>
         </DialogActions>
       </Dialog>
+      <UserManagementDialog
+        open={usersDialogOpen}
+        onClose={() => setUsersDialogOpen(false)}
+        users={usersList}
+        loading={usersLoading}
+        error={usersError}
+        currentUserId={user.id}
+        onRoleChange={handleRoleChange}
+      />
     </Box>
     </ThemeProvider>
   );
@@ -1816,3 +1864,93 @@ function formatCurrency(value: number, currencyCode: string) {
 
 
 export default App;
+
+
+function UserManagementDialog({
+  open,
+  onClose,
+  users,
+  loading,
+  error,
+  currentUserId,
+  onRoleChange,
+}: {
+  open: boolean;
+  onClose: () => void;
+  users: User[];
+  loading: boolean;
+  error: string;
+  currentUserId: number;
+  onRoleChange: (userId: number, role: string) => void;
+}) {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ pb: 1 }}>
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Avatar sx={{ bgcolor: 'primary.main', color: 'background.default' }}><GroupIcon /></Avatar>
+          <Box>
+            <Typography variant="h6" fontWeight={800}>User Access Management</Typography>
+            <Typography variant="body2" color="text.secondary">View registered users and modify their access levels.</Typography>
+          </Box>
+        </Stack>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          {error ? <Alert severity="error">{error}</Alert> : null}
+          {loading ? (
+            <Stack alignItems="center" py={4}><CircularProgress /></Stack>
+          ) : (
+            <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 800 }}>User</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>Email</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>Registered</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>Access Level</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.id} hover>
+                      <TableCell>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Avatar sx={{ width: 32, height: 32, fontSize: '0.85rem', bgcolor: u.role === 'admin' ? 'success.dark' : u.role === 'ops' ? 'warning.dark' : 'action.selected' }}>
+                            {(u.full_name || u.email).substring(0, 2).toUpperCase()}
+                          </Avatar>
+                          <Box>
+                            <Typography fontWeight={700} variant="body2">
+                              {u.full_name || '—'} {u.id === currentUserId ? ' (You)' : ''}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </TableCell>
+                      <TableCell><Typography variant="body2" color="text.secondary">{u.email}</Typography></TableCell>
+                      <TableCell><Typography variant="caption" color="text.secondary">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</Typography></TableCell>
+                      <TableCell>
+                        <FormControl size="small" sx={{ minWidth: 130 }}>
+                          <Select
+                            value={u.role}
+                            onChange={(e) => onRoleChange(u.id, e.target.value)}
+                            sx={{ fontWeight: 700, fontSize: '0.85rem' }}
+                          >
+                            <MenuItem value="admin">Admin</MenuItem>
+                            <MenuItem value="ops">Operations</MenuItem>
+                            <MenuItem value="viewer">Viewer</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Paper>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} variant="outlined">Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

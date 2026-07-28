@@ -3,6 +3,7 @@ export interface User {
   email: string;
   role: 'admin' | 'ops' | 'viewer' | string;
   full_name: string;
+  created_at?: string;
 }
 
 export interface LicenseItem {
