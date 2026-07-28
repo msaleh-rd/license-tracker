@@ -698,9 +698,9 @@ function App() {
                 </IconButton>
               </Tooltip>
               <Button startIcon={<DownloadIcon />} onClick={() => { void exportWorkbook(); }} variant="outlined">Export</Button>
-              <Button component="label" startIcon={importBusy ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />} variant="outlined">
+              <Button component="label" startIcon={importBusy ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />} variant="outlined" disabled={user.role === 'viewer' || importBusy}>
                 Import
-                <input hidden type="file" accept=".xlsx" onChange={handleImport} />
+                <input hidden type="file" accept=".xlsx" onChange={handleImport} disabled={user.role === 'viewer' || importBusy} />
               </Button>
               <Button startIcon={<AddIcon />} onClick={openCreateDrawer} variant="contained" disabled={user.role === 'viewer'}>
                 New Record
