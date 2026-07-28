@@ -62,6 +62,18 @@ class UserRoleUpdate(BaseModel):
     role: str = Field(pattern=r"^(admin|ops|viewer)$")
 
 
+class UserCreate(BaseModel):
+    email: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+    role: str = Field(pattern=r"^(admin|ops|viewer)$", default="viewer")
+    full_name: str = ""
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=1)
+
+
 
 class LicenseBase(BaseModel):
     client: str = Field(min_length=1)

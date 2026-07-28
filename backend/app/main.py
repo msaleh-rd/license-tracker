@@ -30,7 +30,9 @@ from .schemas import (
     LicenseRead,
     LicenseUpdate,
     LoginRequest,
+    PasswordChange,
     TokenResponse,
+    UserCreate,
     UserRead,
     UserRoleUpdate,
 )
@@ -377,6 +379,19 @@ def me(current_user: User = Depends(get_current_user)) -> UserRead:
     return UserRead.model_validate(current_user)
 
 
+@app.patch("/api/auth/change-password")
+def change_password(
+    payload: PasswordChange,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    current_user.password_hash = hash_password(payload.new_password)
+    db.commit()
+    return {"detail": "Password changed successfully"}
+
+
 @app.get("/api/users", response_model=list[UserRead])
 def list_users(
     db: Session = Depends(get_db),
@@ -402,6 +417,27 @@ def update_user_role(
     db.commit()
     db.refresh(target_user)
     return UserRead.model_validate(target_user)
+
+
+@app.post("/api/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def create_user(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+) -> UserRead:
+    existing = db.query(User).filter(User.email == payload.email).one_or_none()
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A user with that username/email already exists")
+    new_user = User(
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        role=payload.role,
+        full_name=payload.full_name or payload.email,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return UserRead.model_validate(new_user)
 
 
 @app.get("/api/licenses", response_model=list[LicenseRead])

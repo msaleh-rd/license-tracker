@@ -54,7 +54,9 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RechartsTooltip, X
 import { createAppTheme, getThemeColors, PALETTE, PALETTE_LIGHT } from './theme';
 
 import GroupIcon from '@mui/icons-material/Group';
-import { deleteLicense, exportWorkbook, getAuditLogs, getCategories, getControlSettings, getDashboard, getInsights, getLicenses, getMe, getKeycloakConfig, getUsers, hydrateAuthToken, login, saveLicense, setAuthToken, updateControlSettings, updateUserRole, uploadWorkbook } from './api';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import { changePassword, createUser, deleteLicense, exportWorkbook, getAuditLogs, getCategories, getControlSettings, getDashboard, getInsights, getLicenses, getMe, getKeycloakConfig, getUsers, hydrateAuthToken, login, saveLicense, setAuthToken, updateControlSettings, updateUserRole, uploadWorkbook } from './api';
 import { initKeycloak, isKeycloakAuthenticated, loginWithKeycloak, logoutKeycloak } from './keycloak';
 import { EMPTY_LICENSE_FORM, type AuditLog, type ControlSettings, type CustomFieldDefinition, type CustomRule, type DashboardResponse, type HeatmapCell, type LicenseFormValues, type LicenseItem, type RiskItem, type RuleAction, type RuleCondition, type SummaryCard, type User } from './types';
 
@@ -202,6 +204,7 @@ function OptionsTextField({ label, options, onOptionsChange, minRows = 3, maxRow
 function App() {
   const [tokenReady, setTokenReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [isSsoUser, setIsSsoUser] = useState(false);
   const [licenses, setLicenses] = useState<LicenseItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [insights, setInsights] = useState<Record<string, number>>({});
@@ -233,6 +236,10 @@ function App() {
   const [usersDialogOpen, setUsersDialogOpen] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
+  const [pwDialogOpen, setPwDialogOpen] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
 
   const appTheme = useMemo(() => createAppTheme(themeMode), [themeMode]);
 
@@ -262,6 +269,7 @@ function App() {
         if (config.enabled) {
           const authenticated = await initKeycloak(config);
           if (authenticated) {
+            setIsSsoUser(true);
             setTokenReady(true);
             void bootstrap();
             return;
@@ -419,6 +427,33 @@ function App() {
     } catch (err: any) {
       const msg = err?.response?.data?.detail;
       setUsersError(typeof msg === 'string' ? msg : 'Failed to update user role.');
+    }
+  }
+
+  async function handleCreateUser(payload: { email: string; password: string; role: string; full_name: string }) {
+    try {
+      setUsersError('');
+      const created = await createUser(payload);
+      setUsersList((current) => [...current, created]);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail;
+      setUsersError(typeof msg === 'string' ? msg : 'Failed to create user.');
+      throw err;
+    }
+  }
+
+  async function handleChangePassword(currentPw: string, newPw: string) {
+    setPwError('');
+    setPwSuccess('');
+    setPwBusy(true);
+    try {
+      await changePassword(currentPw, newPw);
+      setPwSuccess('Password changed successfully.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail;
+      setPwError(typeof msg === 'string' ? msg : 'Failed to change password.');
+    } finally {
+      setPwBusy(false);
     }
   }
 
@@ -619,6 +654,21 @@ function App() {
               <Button startIcon={<GroupIcon />} onClick={openUsersDialog} variant="outlined">
                 Users
               </Button>
+            )}
+            {!isSsoUser && (
+              <Tooltip title="Change your password">
+                <IconButton
+                  onClick={() => { setPwDialogOpen(true); setPwError(''); setPwSuccess(''); }}
+                  color="inherit"
+                  sx={{
+                    border: '1px solid',
+                    borderColor: themeMode === 'dark' ? 'rgba(148, 163, 184, 0.35)' : 'rgba(100, 116, 139, 0.35)',
+                    bgcolor: themeMode === 'dark' ? 'rgba(15, 23, 42, 0.45)' : 'rgba(255, 255, 255, 0.85)',
+                  }}
+                >
+                  <VpnKeyIcon />
+                </IconButton>
+              </Tooltip>
             )}
             <Button startIcon={<TuneIcon />} onClick={openControlDialog} variant="outlined" disabled={user.role === 'viewer'}>
               Controls
@@ -1357,6 +1407,15 @@ function App() {
         error={usersError}
         currentUserId={user.id}
         onRoleChange={handleRoleChange}
+        onCreateUser={handleCreateUser}
+      />
+      <ChangePasswordDialog
+        open={pwDialogOpen}
+        onClose={() => setPwDialogOpen(false)}
+        onSubmit={handleChangePassword}
+        busy={pwBusy}
+        error={pwError}
+        success={pwSuccess}
       />
     </Box>
     </ThemeProvider>
@@ -1873,6 +1932,7 @@ function UserManagementDialog({
   error,
   currentUserId,
   onRoleChange,
+  onCreateUser,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1881,21 +1941,81 @@ function UserManagementDialog({
   error: string;
   currentUserId: number;
   onRoleChange: (userId: number, role: string) => void;
+  onCreateUser: (payload: { email: string; password: string; role: string; full_name: string }) => Promise<void>;
 }) {
+  const [showForm, setShowForm] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const payload = {
+      email: (fd.get('email') as string).trim(),
+      password: (fd.get('password') as string),
+      role: (fd.get('role') as string) || 'viewer',
+      full_name: (fd.get('full_name') as string).trim(),
+    };
+    if (!payload.email || !payload.password) return;
+    setCreating(true);
+    try {
+      await onCreateUser(payload);
+      setShowForm(false);
+      (e.target as HTMLFormElement).reset();
+    } catch { /* error handled by parent */ }
+    setCreating(false);
+  }
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ pb: 1 }}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
           <Avatar sx={{ bgcolor: 'primary.main', color: 'background.default' }}><GroupIcon /></Avatar>
-          <Box>
+          <Box sx={{ flex: 1 }}>
             <Typography variant="h6" fontWeight={800}>User Access Management</Typography>
             <Typography variant="body2" color="text.secondary">View registered users and modify their access levels.</Typography>
           </Box>
+          <Button
+            startIcon={<PersonAddIcon />}
+            variant="contained"
+            size="small"
+            onClick={() => setShowForm(!showForm)}
+          >
+            {showForm ? 'Cancel' : 'Add User'}
+          </Button>
         </Stack>
       </DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           {error ? <Alert severity="error">{error}</Alert> : null}
+          {showForm && (
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <form onSubmit={(e) => void handleAdd(e)}>
+                <Stack spacing={1.5}>
+                  <Typography variant="subtitle2" fontWeight={800}>Create New User</Typography>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                    <TextField name="full_name" label="Full Name" size="small" fullWidth />
+                    <TextField name="email" label="Username or Email" size="small" fullWidth required />
+                  </Stack>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                    <TextField name="password" label="Password" type="password" size="small" fullWidth required />
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Role</InputLabel>
+                      <Select name="role" defaultValue="viewer" label="Role">
+                        <MenuItem value="admin">Admin</MenuItem>
+                        <MenuItem value="ops">Operations</MenuItem>
+                        <MenuItem value="viewer">Viewer</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Stack>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Button type="submit" variant="contained" size="small" disabled={creating}>
+                      {creating ? 'Creating...' : 'Create User'}
+                    </Button>
+                  </Box>
+                </Stack>
+              </form>
+            </Paper>
+          )}
           {loading ? (
             <Stack alignItems="center" py={4}><CircularProgress /></Stack>
           ) : (
@@ -1950,6 +2070,59 @@ function UserManagementDialog({
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button onClick={onClose} variant="outlined">Close</Button>
       </DialogActions>
+    </Dialog>
+  );
+}
+
+
+function ChangePasswordDialog({
+  open,
+  onClose,
+  onSubmit,
+  busy,
+  error,
+  success,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (currentPw: string, newPw: string) => void;
+  busy: boolean;
+  error: string;
+  success: string;
+}) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const cur = fd.get('current_password') as string;
+    const next = fd.get('new_password') as string;
+    const confirm = fd.get('confirm_password') as string;
+    if (next !== confirm) return;
+    onSubmit(cur, next);
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Avatar sx={{ bgcolor: 'warning.main', color: 'background.default' }}><VpnKeyIcon /></Avatar>
+          <Typography variant="h6" fontWeight={800}>Change Password</Typography>
+        </Stack>
+      </DialogTitle>
+      <form onSubmit={handleSubmit}>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            {error ? <Alert severity="error">{error}</Alert> : null}
+            {success ? <Alert severity="success">{success}</Alert> : null}
+            <TextField name="current_password" label="Current Password" type="password" size="small" fullWidth required />
+            <TextField name="new_password" label="New Password" type="password" size="small" fullWidth required />
+            <TextField name="confirm_password" label="Confirm New Password" type="password" size="small" fullWidth required />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={onClose} variant="outlined">Cancel</Button>
+          <Button type="submit" variant="contained" disabled={busy}>{busy ? 'Saving...' : 'Change Password'}</Button>
+        </DialogActions>
+      </form>
     </Dialog>
   );
 }

@@ -81,6 +81,19 @@ export async function updateUserRole(userId: number, role: string) {
   return data;
 }
 
+export async function createUser(payload: { email: string; password: string; role: string; full_name: string }) {
+  const { data } = await api.post<User>('/api/users', payload);
+  return data;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const { data } = await api.patch<{ detail: string }>('/api/auth/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+  return data;
+}
+
 export async function getDashboard() {
   const { data } = await api.get<DashboardResponse>('/api/dashboard');
   return data;
