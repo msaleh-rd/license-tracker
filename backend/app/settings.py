@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     upload_dir: str = "data/uploads"
     default_alert_days_urgent: int = 30
     default_alert_days_review: int = 60
-    demo_admin_email: str = "admin@example.com"
-    demo_admin_password: str = "Admin123!"
+    demo_admin_email: str = "admin"
+    demo_admin_password: str = "admin"
     demo_ops_email: str = "ops@example.com"
     demo_ops_password: str = "Ops123!"
     demo_viewer_email: str = "viewer@example.com"

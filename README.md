@@ -67,12 +67,6 @@ npm run dev
 
 The frontend runs on `http://localhost:3000` and proxies API requests to `http://localhost:8000`.
 
-## Demo Access
-
-- `admin@example.com` / `Admin123!`
-- `ops@example.com` / `Ops123!`
-- `viewer@example.com` / `View123!`
-
 ## Spreadsheet Migration
 
 Use the import action in the UI to upload `license_subscription_tracker.xlsx` or any compatible workbook. The importer:

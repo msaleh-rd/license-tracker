@@ -1425,11 +1425,10 @@ function LoginScreen({ error, onSubmit }: { error: string; onSubmit: (event: Rea
             <Typography variant="caption" color="text.secondary">OR DEMO CREDENTIALS</Typography>
           </Divider>
 
-          <TextField name="email" label="Email" defaultValue="admin@example.com" fullWidth size="small" />
-          <TextField name="password" label="Password" type="password" defaultValue="Admin123!" fullWidth size="small" />
+          <TextField name="email" label="Username or Email" defaultValue="admin" fullWidth size="small" />
+          <TextField name="password" label="Password" type="password" defaultValue="admin" fullWidth size="small" />
           {error ? <Alert severity="error">{error}</Alert> : null}
           <Button type="submit" variant="contained" size="large" color="secondary">Enter dashboard</Button>
-          <Typography variant="caption" color="text.secondary">Demo accounts: admin@example.com / Admin123!, ops@example.com / Ops123!, viewer@example.com / View123!</Typography>
         </Stack>
       </Paper>
     </Box>

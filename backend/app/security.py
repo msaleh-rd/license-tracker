@@ -51,13 +51,35 @@ def decode_keycloak_token(token: str) -> dict[str, Any]:
     keycloak_url = settings.keycloak_url.rstrip("/")
     jwks_uri = f"{keycloak_url}/realms/{settings.keycloak_realm}/protocol/openid-connect/certs"
     client = get_jwks_client(jwks_uri)
-    signing_key = client.get_signing_key_from_jwt(token)
-    return jwt.decode(
-        token,
-        signing_key.key,
-        algorithms=["RS256", "HS256"],
-        options={"verify_aud": False, "verify_iss": False},
-    )
+
+    # Try primary lookup by kid in the JWT header
+    try:
+        signing_key = client.get_signing_key_from_jwt(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256", "HS256"],
+            options={"verify_aud": False, "verify_iss": False},
+        )
+    except (jwt.PyJWKClientError, Exception):
+        pass
+
+    # Fallback: try each signing key from the JWKS endpoint
+    signing_keys = client.get_signing_keys()
+    last_error: Exception | None = None
+    for key in signing_keys:
+        try:
+            return jwt.decode(
+                token,
+                key.key,
+                algorithms=["RS256", "HS256"],
+                options={"verify_aud": False, "verify_iss": False},
+            )
+        except Exception as exc:
+            last_error = exc
+            continue
+
+    raise last_error or ValueError("No signing keys available from Keycloak JWKS endpoint")
 
 
 def get_current_user(
