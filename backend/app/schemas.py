@@ -88,7 +88,7 @@ class LicenseBase(BaseModel):
     technical_contact: str = ""
     license_reference: str = ""
     start_date: date | None = None
-    expiry_date: date
+    expiry_date: date | None = None
     eol_date: date | None = None
     renewal_cycle: str = ""
     auto_renew: bool = False

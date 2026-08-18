@@ -1760,7 +1760,7 @@ function LicenseForm({
           <Grid item xs={6}>
             <FormControl fullWidth>
               <InputLabel>Renewal Cycle</InputLabel>
-              <Select label="Renewal Cycle" value={draft.renewal_cycle} onChange={(event) => onChange('renewal_cycle', event.target.value)}>
+              <Select label="Renewal Cycle" value={draft.renewal_cycle} onChange={(event) => { onChange('renewal_cycle', event.target.value); if (event.target.value === 'One-Time') onChange('expiry_date', ''); }}>
                 <MenuItem value=""><em>Select</em></MenuItem>
                 {optionLists.renewal_cycle_options.map((value) => (
                   <MenuItem key={value} value={value}>{value}</MenuItem>
@@ -1769,7 +1769,9 @@ function LicenseForm({
             </FormControl>
           </Grid>
           <LicenseField xs={4} label="Start Date" type="date" value={draft.start_date} onChange={onChange} name="start_date" />
-          <LicenseField xs={4} label="Expiry Date" type="date" value={draft.expiry_date} onChange={onChange} name="expiry_date" required />
+          {draft.renewal_cycle !== 'One-Time' && (
+            <LicenseField xs={4} label="Expiry Date" type="date" value={draft.expiry_date} onChange={onChange} name="expiry_date" required />
+          )}
           <LicenseField xs={4} label="EOL Date" type="date" value={draft.eol_date} onChange={onChange} name="eol_date" />
           <LicenseField xs={4} label="Last Reviewed" type="date" value={draft.last_reviewed} onChange={onChange} name="last_reviewed" />
           <Grid item xs={4}>
