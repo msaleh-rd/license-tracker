@@ -548,7 +548,15 @@ function App() {
       }
       return;
     }
-    setDraft((current) => ({ ...current, [field]: value }));
+    setDraft((current) => {
+      const next = { ...current, [field]: value };
+      if (field === 'quantity_purchased' || field === 'quantity_in_use') {
+        next.quantity_available = Math.max(0, Number(next.quantity_purchased) - Number(next.quantity_in_use));
+      } else if (field === 'quantity_available') {
+        next.quantity_purchased = Number(next.quantity_in_use) + Number(next.quantity_available);
+      }
+      return next;
+    });
   }
 
   async function handleSave() {
