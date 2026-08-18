@@ -836,6 +836,7 @@ function App() {
                   <Table size="small" sx={{ minWidth: 2350 }}>
                     <TableHead>
                       <TableRow>
+                        <TableCell sx={{ position: 'sticky', left: 0, zIndex: 3, bgcolor: 'background.paper' }}>Actions</TableCell>
                         <TableCell>Client</TableCell>
                         <TableCell>Site / Region</TableCell>
                         <TableCell>Item Type</TableCell>
@@ -859,12 +860,17 @@ function App() {
                         {(controlSettings?.custom_field_definitions ?? []).map((fieldDef) => (
                           <TableCell key={fieldDef.key}>{fieldDef.label}</TableCell>
                         ))}
-                        <TableCell align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {filteredLicenses.map((item) => (
                         <TableRow key={item.id} hover>
+                          <TableCell sx={{ position: 'sticky', left: 0, zIndex: 2, bgcolor: 'background.paper' }}>
+                            <Stack direction="row" spacing={0.5}>
+                              <Tooltip title="Edit"><span><IconButton size="small" disabled={user.role === 'viewer'} onClick={() => openEditDrawer(item)}><EditIcon fontSize="small" /></IconButton></span></Tooltip>
+                              <Tooltip title="Delete"><span><IconButton size="small" disabled={user.role !== 'admin'} onClick={() => setDeleteCandidate(item)}><DeleteIcon fontSize="small" /></IconButton></span></Tooltip>
+                            </Stack>
+                          </TableCell>
                           <TableCell>
                             <Typography fontWeight={700}>{item.client}</Typography>
                             <Typography variant="caption" color="text.secondary">{item.category || '—'}</Typography>
@@ -926,12 +932,6 @@ function App() {
                               </TableCell>
                             );
                           })}
-                          <TableCell align="right">
-                            <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
-                              <Tooltip title="Edit"><span><IconButton size="small" disabled={user.role === 'viewer'} onClick={() => openEditDrawer(item)}><EditIcon fontSize="small" /></IconButton></span></Tooltip>
-                              <Tooltip title="Delete"><span><IconButton size="small" disabled={user.role !== 'admin'} onClick={() => setDeleteCandidate(item)}><DeleteIcon fontSize="small" /></IconButton></span></Tooltip>
-                            </Stack>
-                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
